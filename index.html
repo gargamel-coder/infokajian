@@ -1244,8 +1244,10 @@ var qiblaBearing = function(lat,lng) {
   var p1=lat*Math.PI/180, p2=21.4225*Math.PI/180, dl=(39.8262-lng)*Math.PI/180;
   return (Math.atan2(Math.sin(dl)*Math.cos(p2),Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl))*180/Math.PI+360)%360;
 };
-const fmtDateLong = s => new Date(s+'T12:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const fmtDateLong = s => gantiAhad(new Date(s+'T12:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}));
 const fmtDateShort = s => new Date(s+'T12:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+const gantiAhad = s => s.replace(/Minggu/g,'Ahad'); // ← tambahkan di sini
+const fmtDist = m => m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`;
 const fmtDist = m => m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`;
 const normName = n => n.toLowerCase().replace(/\b(ust\.?|ustadz?|dr\.?|kh\.?|lc\.?|h\.?|hj\.?)\b/gi,'').replace(/\s+/g,' ').trim();
 const getSpeaker = id => DB.speakers.find(s=>s.id===id);
