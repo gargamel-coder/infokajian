@@ -21,7 +21,7 @@ const db  = getFirestore();
 const fcm = getMessaging();
 
 // ─── Konstanta ────────────────────────────────────────────────────────────────
-const PWA_URL    = "https://YOUR-PROJECT.web.app";   // ← ganti dengan domain PWA kamu
+const PWA_URL    = "https://infokajian.vercel.app";   // 
 const ICON_URL   = `${PWA_URL}/icons/icon-192.png`;
 const BADGE_URL  = `${PWA_URL}/icons/badge-72.png`;
 const FCM_BATCH  = 500;   // batas multicast Firebase
