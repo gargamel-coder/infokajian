@@ -19,13 +19,15 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-com
 
 // ─── 2. Konfigurasi Firebase ──────────────────────────────────────────────────
 // Salin dari Firebase Console → Project Settings → Your Apps → Web
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey           : "YOUR_API_KEY",
-  authDomain       : "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId        : "YOUR_PROJECT_ID",
-  storageBucket    : "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId            : "YOUR_APP_ID",
+  apiKey: "AIzaSyD4mdITD16NaPHaaK7zs6ToxvAlyCZA5V4",
+  authDomain: "infokajian-6e053.firebaseapp.com",
+  projectId: "infokajian-6e053",
+  storageBucket: "infokajian-6e053.firebasestorage.app",
+  messagingSenderId: "175043780829",
+  appId: "1:175043780829:web:fbde809754d37ba1e6fb34",
+  measurementId: "G-9SLY8STB0B"
 };
 
 firebase.initializeApp(firebaseConfig);
