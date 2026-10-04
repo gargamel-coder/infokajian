@@ -532,7 +532,9 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 .ik-hs{flex:1;text-align:center;padding:9px 2px 8px;border-radius:13px;background:rgba(255,255,255,.38);transition:background .25s,transform .25s}
 .ik-hs.on{background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.12)}
 .ik-hs .ik-hs-ic{width:22px;height:22px;margin:0 auto 5px;display:flex;align-items:center;justify-content:center}
-.ik-hs .ik-hs-ic svg{width:20px;height:20px}
+.ik-hs .ik-hs-ic svg{width:20px;height:20px;stroke:var(--acc);stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ik-hs.done .ik-hs-ic svg{opacity:.5}
+.ik-hs.on .ik-hs-ic svg{stroke:var(--acc)}
 .ik-hs .ik-hs-nm{font-size:9.5px;font-weight:700;color:rgba(31,74,44,.82);letter-spacing:.1px}
 .ik-hs .ik-hs-tm{font-size:12px;font-weight:800;color:var(--onp);margin-top:1px}
 .ik-hs.on .ik-hs-nm{color:var(--acc)}
@@ -545,14 +547,11 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 #detail-hero,#detail-hero *,#admin-hero,#admin-hero *,#contrib-dash-hero,#contrib-dash-hero *,
 .streak-card,.streak-card *,.gamif-header,.gamif-header *{color:var(--onp)!important}
 #detail-hero svg,#admin-hero svg,.streak-card svg,.gamif-header svg{stroke:var(--onp)!important}
-.streak-card,.gamif-header,.streak-card *,.gamif-header *{color:var(--onp)!important}
-.streak-card .streak-label,.streak-card .streak-num{color:var(--onp)!important}
 
 /* Kartu countdown */
 .ik-count{background:var(--card);border-radius:22px;padding:20px 20px 18px;box-shadow:var(--shadow);border:1px solid var(--border2)}
 .ik-count-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .ik-count-h{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
-.ik-count-d{font-size:11px;font-weight:700;color:var(--accent)}
 .ik-count-n{font-size:44px;font-weight:800;line-height:1;color:var(--acc);letter-spacing:-1.5px;margin:9px 0 0;font-variant-numeric:tabular-nums}
 .ik-count-sub{font-size:13.5px;color:var(--text);margin-top:9px}
 .ik-count-sub b{font-weight:800}
@@ -560,23 +559,6 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 .ik-bar{position:relative;height:10px;border-radius:6px;background:var(--pl);margin-top:15px}
 .ik-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#D3EFD3,#AFE1AF);transition:width .6s linear}
 .ik-bar-dot{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--acc);transform:translate(-50%,-50%);transition:left .6s linear;box-shadow:0 2px 8px rgba(35,53,44,.18)}
-
-/* Tabel 6 waktu salat */
-.ik-tbl-head{display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 10px}
-.ik-tbl-head .ik-prog{font-size:12px;font-weight:700;color:var(--muted)}
-.ik-tbl-head .ik-prog b{color:var(--acc)}
-.ik-tbl{background:var(--card);border-radius:20px;padding:6px 4px 10px;box-shadow:var(--shadow);border:1px solid var(--border2);display:flex}
-.ik-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 2px;border-radius:14px;transition:background .25s}
-.ik-col.active{background:var(--pl)}
-.ik-col .ik-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
-.ik-col .ik-ico svg{width:26px;height:26px}
-.ik-col .ik-nm{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center}
-.ik-col.active .ik-nm{color:var(--acc)}
-.ik-col .ik-tm{font-size:13.5px;font-weight:800;color:var(--text)}
-.ik-col.done .ik-ico,.ik-col.done .ik-tm{opacity:.45}
-.ik-col .ik-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--border);transition:all .25s}
-.ik-col.done .ik-dot{background:var(--p);border-color:var(--acc)}
-.ik-col .ik-nx{font-size:8.5px;font-weight:800;color:var(--accent);letter-spacing:.4px}
 
 /* Layar Masjid Terdekat */
 .ik-mosque-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
@@ -609,43 +591,6 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 .ik-util-i svg{width:17px;height:17px;stroke:var(--acc);stroke-width:2;flex-shrink:0}
 
 /* Pintasan bulat */
-.ik-short{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 4px}
-.ik-short-i{flex:0 0 auto;width:64px;text-align:center;cursor:pointer}
-.ik-short-c{width:58px;height:58px;border-radius:50%;margin:0 auto 7px;display:flex;align-items:center;justify-content:center;background:var(--pl);border:1.5px solid var(--border);color:var(--acc);transition:transform .15s,box-shadow .15s}
-.ik-short-i:active .ik-short-c{transform:scale(.94);box-shadow:var(--shadow2)}
-.ik-short-c svg{width:24px;height:24px;stroke-width:1.9}
-.ik-short-l{font-size:11px;font-weight:700;color:var(--sub)}
-
-/* Kartu countdown "Menuju <salat>" */
-.ik-count{background:var(--card);border-radius:22px;padding:22px 20px 18px;box-shadow:var(--shadow);border:1px solid var(--border2);text-align:center}
-.ik-count-h{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
-.ik-count-n{font-size:64px;font-weight:800;line-height:1;color:var(--acc);letter-spacing:-2px;margin:6px 0 0}
-.ik-count-u{font-size:13px;font-weight:700;color:var(--muted);margin-left:4px}
-.ik-count-sub{font-size:14px;color:var(--text);margin-top:10px}
-.ik-count-sub b{font-weight:800}
-.ik-count-sub span{color:var(--muted)}
-.ik-bar{position:relative;height:10px;border-radius:6px;background:var(--pl);margin-top:16px;overflow:visible}
-.ik-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#D3EFD3,#AFE1AF);transition:width .6s ease}
-.ik-bar-dot{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--acc);transform:translate(-50%,-50%);transition:left .6s ease;box-shadow:0 2px 8px rgba(35,53,44,.18)}
-
-/* Tabel 6 waktu salat */
-.ik-tbl{background:var(--card);border-radius:20px;padding:6px 4px 10px;box-shadow:var(--shadow);border:1px solid var(--border2);display:flex;margin-top:12px}
-.ik-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 2px;border-radius:14px;position:relative;transition:background .25s}
-.ik-col.active{background:var(--pl)}
-.ik-col .ik-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
-.ik-col .ik-ico svg{width:26px;height:26px}
-.ik-col .ik-nm{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.1px;text-align:center}
-.ik-col.active .ik-nm{color:var(--acc)}
-.ik-col .ik-tm{font-size:13.5px;font-weight:800;color:var(--text)}
-.ik-col.done .ik-ico,.ik-col.done .ik-tm{opacity:.45}
-.ik-col .ik-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--border);margin-top:2px;transition:all .25s}
-.ik-col.done .ik-dot{background:var(--p);border-color:var(--acc)}
-.ik-col .ik-nx{font-size:8.5px;font-weight:800;color:var(--accent);letter-spacing:.4px}
-.ik-tbl-foot{display:flex;justify-content:space-between;align-items:center;padding:0 4px;margin-top:8px}
-.ik-tbl-foot .ik-prog{font-size:12px;font-weight:700;color:var(--muted)}
-.ik-tbl-foot .ik-prog b{color:var(--acc)}
-
-/* Shortcut bulat */
 .ik-short{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 4px}
 .ik-short-i{flex:0 0 auto;width:64px;text-align:center;cursor:pointer}
 .ik-short-c{width:58px;height:58px;border-radius:50%;margin:0 auto 7px;display:flex;align-items:center;justify-content:center;background:var(--pl);border:1.5px solid var(--border);color:var(--acc);transition:transform .15s,box-shadow .15s}
@@ -990,17 +935,11 @@ function showBanner() {
         <div class="ik-count">
           <div class="ik-count-top">
             <span class="ik-count-h" id="ik-count-h">Menuju Ashar</span>
-            <span class="ik-count-d" id="ik-count-d"></span>
           </div>
           <div class="ik-count-n" id="ik-count-n">--:--:--</div>
           <div class="ik-count-sub"><b id="ik-azan">Azan --:--</b><span id="ik-note"> · Memuat waktu salat...</span></div>
           <div class="ik-bar"><div class="ik-bar-fill" id="ik-bar-fill" style="width:0%"></div><div class="ik-bar-dot" id="ik-bar-dot" style="left:0%"></div></div>
         </div>
-        <div class="ik-tbl-head">
-          <div class="section-title" style="font-size:15px">Waktu Salat Hari Ini</div>
-          <div class="ik-prog"><b id="ik-prog">0/5</b> selesai</div>
-        </div>
-        <div class="ik-tbl" id="ik-tbl"></div>
         <!-- Last Read -->
         <div class="ik-lastread" id="ik-lastread" onclick="goScreen('kajian')">
           <div class="ik-lr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
@@ -2317,57 +2256,52 @@ function toggleBmFromCard(id) {
 // ══════════════════════════════════════════
 const PRAYER_NAMES = ['Subuh','Dzuhur','Ashar','Maghrib','Isya'];
 const PRAYER_ICONS = [
-  // Subuh - bintang & bulan fajar
-  `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px">
-    <circle cx="20" cy="26" r="10" fill="#AFE1AF" opacity=".15"/>
-    <path d="M20 16 Q24 20 20 24 Q16 20 20 16Z" fill="#AFE1AF" opacity=".4"/>
-    <path d="M14 10 Q18 6 22 10 Q18 14 14 10Z" fill="#C98A4B" opacity=".7"/>
-    <line x1="20" y1="4" x2="20" y2="7" stroke="#C98A4B" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="26" y1="6" x2="24.5" y2="8.5" stroke="#C98A4B" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M8 22 Q12 14 20 16 Q14 18 12 26Z" fill="#C98A4B" opacity=".8"/>
+  // Subuh — bulan sabit di atas garis ufuk (fajar)
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 19h18"/>
+    <path d="M18.5 13.5A5.5 5.5 0 1 1 12 6.5a4.4 4.4 0 0 0 6.5 7z"/>
   </svg>`,
-  // Dzuhur - matahari penuh
-  `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px">
-    <circle cx="20" cy="20" r="8" fill="#F59E0B"/>
-    <g stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round" opacity=".7">
-      <line x1="20" y1="4" x2="20" y2="8"/>
-      <line x1="20" y1="32" x2="20" y2="36"/>
-      <line x1="4" y1="20" x2="8" y2="20"/>
-      <line x1="32" y1="20" x2="36" y2="20"/>
-      <line x1="8.7" y1="8.7" x2="11.5" y2="11.5"/>
-      <line x1="28.5" y1="28.5" x2="31.3" y2="31.3"/>
-      <line x1="31.3" y1="8.7" x2="28.5" y2="11.5"/>
-      <line x1="11.5" y1="28.5" x2="8.7" y2="31.3"/>
-    </g>
+  // Terbit — matahari naik + panah ke atas
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 19h18"/>
+    <path d="M16 19a4 4 0 0 0-8 0"/>
+    <path d="M12 11.5V4.5"/>
+    <path d="M9.6 6.9 12 4.5l2.4 2.4"/>
   </svg>`,
-  // Ashar - matahari rendah sore
-  `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px">
-    <rect x="2" y="28" width="36" height="4" rx="2" fill="#AFE1AF" opacity=".1"/>
-    <circle cx="20" cy="26" r="9" fill="#FB923C"/>
-    <g stroke="#FB923C" stroke-width="1.6" stroke-linecap="round" opacity=".6">
-      <line x1="20" y1="8" x2="20" y2="12"/>
-      <line x1="6" y1="14" x2="9" y2="16.5"/>
-      <line x1="34" y1="14" x2="31" y2="16.5"/>
-    </g>
+  // Dzuhur — matahari penuh
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2.6v2.2"/>
+    <path d="M12 19.2v2.2"/>
+    <path d="M2.6 12h2.2"/>
+    <path d="M19.2 12h2.2"/>
+    <path d="M5.4 5.4 6.9 6.9"/>
+    <path d="M17.1 17.1 18.6 18.6"/>
+    <path d="M18.6 5.4 17.1 6.9"/>
+    <path d="M6.9 17.1 5.4 18.6"/>
   </svg>`,
-  // Maghrib - matahari terbenam
-  `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px">
-    <rect x="2" y="26" width="36" height="3" rx="1.5" fill="#AFE1AF" opacity=".15"/>
-    <path d="M6 26 Q20 8 34 26Z" fill="#F97316" opacity=".25"/>
-    <circle cx="20" cy="26" r="8" fill="#EF4444"/>
-    <path d="M4 26 L36 26" stroke="#AFE1AF" stroke-width="1.5" opacity=".3"/>
-    <path d="M8 30 L32 30" stroke="#AFE1AF" stroke-width="1" opacity=".15"/>
+  // Ashar — matahari condong + ufuk
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="13.5" r="3.8"/>
+    <path d="M12 5v2"/>
+    <path d="M5.2 7.7 6.6 9.1"/>
+    <path d="M18.8 7.7 17.4 9.1"/>
+    <path d="M3 20h18"/>
   </svg>`,
-  // Isya - bulan & bintang malam
-  `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px">
-    <circle cx="20" cy="20" r="16" fill="#1e1b4b" opacity=".08"/>
-    <path d="M22 8 Q14 12 14 20 Q14 28 22 32 Q10 30 10 20 Q10 10 22 8Z" fill="#6366f1" opacity=".8"/>
-    <circle cx="28" cy="10" r="1.5" fill="#C98A4B"/>
-    <circle cx="32" cy="18" r="1" fill="#C98A4B" opacity=".7"/>
-    <circle cx="24" cy="6" r="1" fill="#C98A4B" opacity=".6"/>
+  // Maghrib — matahari terbenam + panah ke bawah
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 19h18"/>
+    <path d="M16 19a4 4 0 0 0-8 0"/>
+    <path d="M12 4v6.5"/>
+    <path d="M9.6 8.1 12 10.5l2.4-2.4"/>
+  </svg>`,
+  // Isya — bulan sabit + bintang (malam)
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19.5 14.2A7 7 0 1 1 10.6 5.3a5.6 5.6 0 0 0 8.9 8.9z"/>
+    <path d="M5.6 4.4l.55 1.3 1.3.55-1.3.55-.55 1.3-.55-1.3-1.3-.55 1.3-.55z"/>
+    <circle cx="19.8" cy="6.2" r=".75"/>
   </svg>`
 ];
-
 function renderHomePrayerMini() {
   const el = document.getElementById('home-prayer-cards');
   if(!el) return;
@@ -2459,7 +2393,7 @@ function ikTick(){
   const sisaSec = Math.max(0, Math.round((nextMin-curMin)*60));
 
   const g=function(id){ return document.getElementById(id); };
-  const hEl=g('ik-count-h'), nEl=g('ik-count-n'), dEl=g('ik-count-d'),
+  const hEl=g('ik-count-h'), nEl=g('ik-count-n'),
         azEl=g('ik-azan'), ntEl=g('ik-note'), fEl=g('ik-bar-fill'), bdEl=g('ik-bar-dot');
 
   if(hEl) hEl.textContent='Menuju '+nx.name;
@@ -2467,7 +2401,6 @@ function ikTick(){
     const hh=Math.floor(sisaSec/3600), mm=Math.floor((sisaSec%3600)/60), ss=sisaSec%60;
     nEl.textContent = ik2(hh)+':'+ik2(mm)+':'+ik2(ss);
   }
-  if(dEl) dEl.textContent = 'Azan '+ikFmt(nextMin);
 
   // salat terakhir yang sudah masuk
   let lastIdx=-1;
@@ -2492,7 +2425,7 @@ function ikTick(){
       const k=i, isPray=IK_PRAY.indexOf(n)>-1;
       const isOn=(i===nextIdx);
       const isDone=isPray && done.indexOf(n)>-1;
-      const icon=(typeof PRAYER_ICONS!=='undefined'&&isPray)?PRAYER_ICONS[IK_PRAY.indexOf(n)]:'';
+      const icon=(typeof PRAYER_ICONS!=='undefined')?PRAYER_ICONS[IK_NAMES.indexOf(n)]:'';
       return '<div class="ik-hs '+(isOn?'on ':'')+(isDone?'done':'')+'">'
         + '<div class="ik-hs-ic">'+icon+'</div>'
         + '<div class="ik-hs-nm">'+n+'</div>'
@@ -2501,38 +2434,6 @@ function ikTick(){
     }).join('');
   }
 
-  // tabel 6 kolom (bisa diklik untuk tandai selesai)
-  const tbl=g('ik-tbl');
-  if(tbl){
-    const done=ikGetDone();
-    tbl.innerHTML = IK_NAMES.map(function(n,i){
-      const k=i, isPray=IK_PRAY.indexOf(n)>-1;
-      const isOn=(i===nextIdx);
-      const isDone=isPray && done.indexOf(n)>-1;
-      const isPast=ikMin(IK_TIMES[k])<=nm && !isOn;
-      const icon=(typeof PRAYER_ICONS!=='undefined'&&isPray)?PRAYER_ICONS[IK_PRAY.indexOf(n)]:'';
-      const click=isPray?' onclick="ikToggleDone(\''+n+'\')"':'';
-      return '<div class="ik-col '+(isOn?'active ':'')+(isDone?'done':'')+'"'+click+'>'
-        + '<div class="ik-ico">'+icon+'</div>'
-        + '<div class="ik-nm">'+n+'</div>'
-        + '<div class="ik-tm"'+(isPast&&!isDone?' style="opacity:.55"':'')+'>'+ikFmt(ikMin(IK_TIMES[k]))+'</div>'
-        + '<div class="ik-dot"></div>'
-        + (isOn?'<div class="ik-nx">BERIKUTNYA</div>':'')
-        + '</div>';
-    }).join('');
-  }
-
-  const pr=g('ik-prog');
-  if(pr) pr.textContent = ikGetDone().filter(function(n){ return IK_PRAY.indexOf(n)>-1; }).length + '/5';
-}
-
-function ikToggleDone(nm){
-  if(IK_PRAY.indexOf(nm)<0) return;
-  const d=ikGetDone(), i=d.indexOf(nm);
-  if(i>-1){ d.splice(i,1); } else { d.push(nm); }
-  ikSetDone(d);
-  ikTick();
-  showToast(i>-1 ? (nm+' dibatalkan') : (nm+' ditandai selesai'), 's');
 }
 
 function ikFetchTimes(){
