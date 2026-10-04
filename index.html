@@ -568,6 +568,20 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 .ik-col.done .ik-dot{background:var(--p);border-color:var(--p)}
 .ik-col .ik-nx{font-size:8.5px;font-weight:800;color:var(--accent);letter-spacing:.4px}
 
+/* Layar Masjid Terdekat */
+.ik-mosque-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.ik-mqcard{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--border2);border-radius:18px;padding:14px;box-shadow:var(--shadow);margin-bottom:10px}
+.ik-mqcard-ic{width:44px;height:44px;border-radius:14px;background:var(--pl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ik-mqcard-ic svg{width:21px;height:21px;stroke:var(--p);stroke-width:2}
+.ik-mqcard-n{font-size:14.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ik-mqcard-a{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ik-mqcard-m{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.ik-mqcard-d{font-size:11px;font-weight:800;color:var(--p);background:var(--pl);border-radius:8px;padding:3px 8px}
+.ik-mqcard-t{font-size:11px;color:var(--muted);font-weight:600}
+.ik-mqcard-nav{width:36px;height:36px;border-radius:11px;background:var(--pl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ik-mqcard-nav svg{width:16px;height:16px;stroke:var(--p)}
+.ik-mqcard-nav:active{transform:scale(.94)}
+
 /* Last Read */
 .ik-lastread{display:flex;align-items:center;gap:13px;background:var(--card);border-radius:20px;padding:14px 16px;box-shadow:var(--shadow);border:1px solid var(--border2);margin-top:12px;cursor:pointer;transition:transform .15s}
 .ik-lastread:active{transform:scale(.985)}
@@ -993,7 +1007,7 @@ function showBanner() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
             <span>Arah Kiblat</span>
           </button>
-          <button class="ik-util-i" onclick="goScreen('prayer')">
+          <button class="ik-util-i" onclick="goScreen('mosques')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span>Masjid Terdekat</span>
           </button>
@@ -1188,6 +1202,18 @@ function showBanner() {
     </div>
     <div class="screen-content" style="padding:24px 20px">
       <div id="qibla-content"></div>
+    </div>
+  </div>
+
+  <!-- ════ SCREEN: MASJID TERDEKAT ════ -->
+  <div id="scr-mosques" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="goBack()" aria-label="Kembali" title="Kembali"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:20px;height:20px"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="hdr-title">Masjid Terdekat</div>
+    </div>
+    <div class="screen-content" style="padding:16px">
+      <div id="mosques-hint"></div>
+      <div id="mosques-list"></div>
     </div>
   </div>
 
@@ -2046,6 +2072,7 @@ function onScreenEnter(name) {
   if (name==='kajian') renderKajianList();
   if (name==='prayer') renderPrayer();
   if (name==='qibla') renderQibla();
+  if (name==='mosques') renderMosques();
   if (name==='profile') renderProfile();
   if (name==='saved') renderSaved();
   if (name==='reminders') renderReminders();
@@ -2560,6 +2587,77 @@ function renderHomeExtras(){
   if(!window._ikTimer){
     window._ikTimer=setInterval(function(){ try{ ikTick(); }catch(e){} }, 1000);
   }
+}
+
+// ══════════════════════════════════════════
+// LAYAR MASJID TERDEKAT
+// ══════════════════════════════════════════
+function renderMosques(){
+  const listEl=document.getElementById('mosques-list');
+  const hintEl=document.getElementById('mosques-hint');
+  if(!listEl) return;
+
+  const all=(DB.mosques||[]).filter(function(m){ return m && m.name; });
+  if(!all.length){
+    if(hintEl) hintEl.innerHTML='';
+    listEl.innerHTML=emptyStateHTML('search','Belum ada data masjid','Data masjid akan muncul setelah ditambahkan','Jelajahi Kajian',"goScreen('kajian')");
+    return;
+  }
+
+  const nx=ikNext();
+  const nextMin=ikMin(IK_TIMES[nx.idx]) + (nx.wrap?1440:0);
+
+  let rows, mode;
+  if(state.location){
+    mode='near';
+    rows=all.map(function(m){
+      const c={}; for(const k in m) c[k]=m[k];
+      c.dist=(m.lat!=null&&m.lng!=null)
+        ? haversine(state.location.lat,state.location.lng,m.lat,m.lng)
+        : Infinity;
+      return c;
+    }).sort(function(a,b){ return a.dist-b.dist; });
+  } else {
+    mode='all';
+    rows=all.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  }
+
+  if(hintEl){
+    hintEl.innerHTML = state.location
+      ? '<div class="ik-mosque-hint">Diurutkan dari yang terdekat · '+rows.length+' masjid</div>'
+      : '<div class="ik-mosque-hint">Aktifkan lokasi untuk mengurutkan dari yang terdekat'
+        + '<button onclick="getLocation()" style="margin-left:8px;background:var(--p);color:#fff;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:700">Aktifkan</button></div>';
+  }
+
+  listEl.innerHTML = rows.map(function(m){
+    const distTxt = (m.dist!=null && m.dist!==Infinity) ? fmtDist(m.dist) : null;
+    const addr = m.address || [m.district,m.city].filter(Boolean).join(', ') || '';
+    return '<div class="ik-mqcard">'
+      + '<div class="ik-mqcard-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">'
+      + '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div class="ik-mqcard-n">'+m.name+'</div>'
+      +   (addr?'<div class="ik-mqcard-a">'+addr+'</div>':'')
+      +   '<div class="ik-mqcard-m">'
+      +     (distTxt?'<span class="ik-mqcard-d">'+distTxt+'</span>':'')
+      +     '<span class="ik-mqcard-t">Azan '+ikFmt(nextMin)+' '+nx.name+'</span>'
+      +   '</div>'
+      + '</div>'
+      + '<button class="ik-mqcard-nav" onclick="ikOpenMaps('+ (m.lat!=null?m.lat:'null') +','+ (m.lng!=null?m.lng:'null') +',' + JSON.stringify(m.name||'') + ')" aria-label="Buka peta" title="Buka peta">'
+      +   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>'
+      + '</button>'
+      + '</div>';
+  }).join('');
+
+  if(mode==='all' && !state.location){
+    // tanpa lokasi: tetap tampilkan semua, urut nama
+  }
+}
+
+function ikOpenMaps(lat,lng,name){
+  if(lat==null||lng==null){ showToast('Koordinat masjid belum tersedia','w'); return; }
+  const q=encodeURIComponent((name||'Masjid')+' '+lat+','+lng);
+  window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank');
 }
 
 function renderHome() {
