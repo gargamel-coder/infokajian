@@ -5,8 +5,8 @@
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#2D6A4F",
+  "background_color": "#F4F9F6",
+  "theme_color": "#2E7D5B",
   "lang": "id",
   "icons": [
     {
@@ -58,21 +58,35 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "lifestyle", "religion"],
+  "categories": [
+    "education",
+    "lifestyle",
+    "religion"
+  ],
   "shortcuts": [
     {
       "name": "Kajian Hari Ini",
       "short_name": "Kajian",
       "description": "Lihat kajian hari ini",
       "url": "/#/kajian",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
       "name": "Jadwal Sholat",
       "short_name": "Sholat",
       "description": "Cek jadwal sholat",
       "url": "/#/prayer",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }
