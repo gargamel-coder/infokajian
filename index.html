@@ -515,12 +515,82 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
   }
 
 /* ══════════════════════════════════════════
-   RESTYLE v1.2.0 — Hijau Pastel Modern-Elegan
+   HEADER GAYA REFERENSI — jam besar + tanggal + deret salat
    ══════════════════════════════════════════ */
+.ik-hdr{background:linear-gradient(150deg,#3E9B84 0%,#2E7D5B 55%,#256B4E 100%);padding:calc(14px + env(safe-area-inset-top,0px)) 18px 16px;position:relative;border-radius:0 0 26px 26px;overflow:hidden}
+.ik-hdr .ornament-bg{opacity:.06}
+.ik-hdr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;position:relative;z-index:1}
+.ik-hdr-clock{font-size:34px;font-weight:800;color:#fff;line-height:1;letter-spacing:-1px}
+.ik-hdr-date{font-size:12px;color:rgba(255,255,255,.78);font-weight:600;margin-top:5px}
+.ik-hdr-btn{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+.ik-hdr-btn:active{background:rgba(255,255,255,.3)}
+.ik-hdr-loc{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:12px;color:rgba(255,255,255,.85);font-weight:600;position:relative;z-index:1}
+.ik-hdr-loc svg{width:13px;height:13px;stroke:rgba(255,255,255,.85);stroke-width:2;flex-shrink:0}
+.ik-hdr-locbtn{margin-top:8px;background:rgba(255,255,255,.2);color:#fff;border-radius:10px;padding:7px 14px;font-size:12.5px;font-weight:700}
+.ik-hdr-strip{display:flex;gap:6px;margin-top:16px;position:relative;z-index:1}
+.ik-hs{flex:1;text-align:center;padding:9px 2px 8px;border-radius:13px;background:rgba(255,255,255,.10);transition:background .25s,transform .25s}
+.ik-hs.on{background:rgba(255,255,255,.95);box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.ik-hs .ik-hs-ic{width:22px;height:22px;margin:0 auto 5px;display:flex;align-items:center;justify-content:center}
+.ik-hs .ik-hs-ic svg{width:20px;height:20px}
+.ik-hs .ik-hs-nm{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:.1px}
+.ik-hs .ik-hs-tm{font-size:12px;font-weight:800;color:#fff;margin-top:1px}
+.ik-hs.on .ik-hs-nm{color:var(--p)}
+.ik-hs.on .ik-hs-tm{color:var(--text)}
+.ik-hs.done{opacity:.55}
 
-/* Hero: gradasi hijau pastel + teks terang */
-#home-hero{background:linear-gradient(155deg,#4E9C77 0%,#2E7D5B 60%,#25664A 100%)!important;border-radius:0 0 26px 26px}
-#home-hero .ornament-bg{opacity:.35}
+/* Kartu countdown */
+.ik-count{background:var(--card);border-radius:22px;padding:20px 20px 18px;box-shadow:var(--shadow);border:1px solid var(--border2)}
+.ik-count-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ik-count-h{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.ik-count-d{font-size:11px;font-weight:700;color:var(--accent)}
+.ik-count-n{font-size:44px;font-weight:800;line-height:1;color:var(--p);letter-spacing:-1.5px;margin:9px 0 0;font-variant-numeric:tabular-nums}
+.ik-count-sub{font-size:13.5px;color:var(--text);margin-top:9px}
+.ik-count-sub b{font-weight:800}
+.ik-count-sub span{color:var(--muted)}
+.ik-bar{position:relative;height:10px;border-radius:6px;background:var(--pl);margin-top:15px}
+.ik-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#AFD8C1,#2E7D5B);transition:width .6s linear}
+.ik-bar-dot{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--p);transform:translate(-50%,-50%);transition:left .6s linear;box-shadow:0 2px 8px rgba(35,53,44,.18)}
+
+/* Tabel 6 waktu salat */
+.ik-tbl-head{display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 10px}
+.ik-tbl-head .ik-prog{font-size:12px;font-weight:700;color:var(--muted)}
+.ik-tbl-head .ik-prog b{color:var(--p)}
+.ik-tbl{background:var(--card);border-radius:20px;padding:6px 4px 10px;box-shadow:var(--shadow);border:1px solid var(--border2);display:flex}
+.ik-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 2px;border-radius:14px;transition:background .25s}
+.ik-col.active{background:var(--pl)}
+.ik-col .ik-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+.ik-col .ik-ico svg{width:26px;height:26px}
+.ik-col .ik-nm{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center}
+.ik-col.active .ik-nm{color:var(--p)}
+.ik-col .ik-tm{font-size:13.5px;font-weight:800;color:var(--text)}
+.ik-col.done .ik-ico,.ik-col.done .ik-tm{opacity:.45}
+.ik-col .ik-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--border);transition:all .25s}
+.ik-col.done .ik-dot{background:var(--p);border-color:var(--p)}
+.ik-col .ik-nx{font-size:8.5px;font-weight:800;color:var(--accent);letter-spacing:.4px}
+
+/* Last Read */
+.ik-lastread{display:flex;align-items:center;gap:13px;background:var(--card);border-radius:20px;padding:14px 16px;box-shadow:var(--shadow);border:1px solid var(--border2);margin-top:12px;cursor:pointer;transition:transform .15s}
+.ik-lastread:active{transform:scale(.985)}
+.ik-lr-ic{width:44px;height:44px;border-radius:14px;background:var(--pl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ik-lr-ic svg{width:21px;height:21px;stroke:var(--p);stroke-width:2}
+.ik-lr-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.ik-lr-t{font-size:14.5px;font-weight:800;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ik-lr-s{font-size:11.5px;color:var(--muted);margin-top:1px}
+.ik-lr-btn{background:var(--p);color:#fff;font-size:12px;font-weight:700;border-radius:10px;padding:8px 14px;flex-shrink:0}
+
+/* Utility 2 tombol */
+.ik-util{display:flex;gap:10px;margin-top:12px}
+.ik-util-i{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:13px 8px;box-shadow:var(--shadow);font-size:12.5px;font-weight:700;color:var(--text);transition:transform .15s}
+.ik-util-i:active{transform:scale(.97)}
+.ik-util-i svg{width:17px;height:17px;stroke:var(--p);stroke-width:2;flex-shrink:0}
+
+/* Pintasan bulat */
+.ik-short{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 4px}
+.ik-short-i{flex:0 0 auto;width:64px;text-align:center;cursor:pointer}
+.ik-short-c{width:58px;height:58px;border-radius:50%;margin:0 auto 7px;display:flex;align-items:center;justify-content:center;background:var(--pl);border:1.5px solid var(--border);color:var(--p);transition:transform .15s,box-shadow .15s}
+.ik-short-i:active .ik-short-c{transform:scale(.94);box-shadow:var(--shadow2)}
+.ik-short-c svg{width:24px;height:24px;stroke-width:1.9}
+.ik-short-l{font-size:11px;font-weight:700;color:var(--sub)}
 
 /* Kartu countdown "Menuju <salat>" */
 .ik-count{background:var(--card);border-radius:22px;padding:22px 20px 18px;box-shadow:var(--shadow);border:1px solid var(--border2);text-align:center}
@@ -563,14 +633,6 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 .scr-back-float{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:14px;width:38px;height:38px;border-radius:11px;background:var(--pl);color:var(--p);display:none;align-items:center;justify-content:center;z-index:95;box-shadow:var(--shadow);border:1px solid var(--border)}
 .scr-back-float:active{transform:scale(.94)}
 
-/* Kartu "Temukan masjid terdekat" */
-.ik-mosque{background:var(--card);border-radius:20px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border2);display:flex;align-items:center;gap:14px;cursor:pointer;transition:transform .15s}
-.ik-mosque:active{transform:scale(.985)}
-.ik-mosque-ic{width:46px;height:46px;border-radius:14px;background:var(--pl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ik-mosque-ic svg{width:22px;height:22px;stroke:var(--p);stroke-width:2}
-.ik-mosque-t{font-size:15px;font-weight:800;color:var(--text)}
-.ik-mosque-s{font-size:12.5px;color:var(--muted);margin-top:2px}
-.ik-mosque-chev{color:var(--muted);flex-shrink:0}
 </style>
  
 <!-- Banner HTML akan di-inject oleh JavaScript di bawah -->
@@ -695,7 +757,22 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
     deferredPrompt = e;
   });
  
-  function showBanner() {
+  // Selaraskan #app dengan tinggi banner install supaya bottom nav tidak terpotong
+function ikSyncBannerOffset(){
+  var app=document.getElementById('app');
+  var b=document.getElementById('pwa-install-banner');
+  if(!app) return;
+  // Ukur BANNER-nya (position:fixed, tinggi pasti). Spacer tidak bisa dipakai
+  // karena tingginya masih 0 saat transisi CSS baru mulai.
+  var h = (b && b.getBoundingClientRect().height > 1) ? Math.round(b.getBoundingClientRect().height) : 0;
+  // Spacer (static, sebelum #app) SUDAH mendorong #app turun sebesar h.
+  // Jadi cukup kurangi tinggi #app; jangan tambah margin-top (nanti dobel).
+  app.style.height = (h > 0) ? ('calc(100dvh - ' + h + 'px)') : '';
+}
+window.addEventListener('resize', function(){ try{ ikSyncBannerOffset(); }catch(e){} });
+window.ikSyncBannerOffset = ikSyncBannerOffset;
+
+function showBanner() {
     // Jangan tampilkan jika sudah standalone
     if (isStandalone()) return;
  
@@ -730,6 +807,7 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
     // Aktifkan spacer
     const spacer = document.getElementById('pwa-install-banner-spacer');
     if (spacer) spacer.classList.remove('pwa-hidden');
+    try { ikSyncBannerOffset(); } catch(e) {}
  
     // Event: Tombol Close
     document.getElementById('pwa-btn-close').addEventListener('click', function() {
@@ -767,6 +845,7 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
       setTimeout(function() {
         banner.remove();
         if (spacer) spacer.classList.add('pwa-hidden');
+        try { ikSyncBannerOffset(); } catch(e) {}
       }, 300);
     }
  
@@ -814,28 +893,27 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
   <!-- ════ SCREEN: HOME ════ -->
   <div id="scr-home" class="screen active">
     <div class="screen-content">
-      <!-- Hero -->
-      <div id="home-hero" style="background:var(--p);padding:20px 20px 0;position:relative">
-        <div class="ornament-bg"></div>
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px">
-          <div>
-            <span style="font-size:22px;color:#fff;font-family:'More Sugar',cursive;letter-spacing:0.5px;line-height:1;display:block">Info Kajian</span>
-            <span style="font-size:11px;color:rgba(255,255,255,.7);font-weight:500;margin-top:3px;display:block">Temukan kajian terdekat</span>
+      <!-- ═══ HEADER (gaya referensi: jam, tanggal, deret salat) ═══ -->
+      <div id="home-hero" class="ik-hdr">
+        <div class="ornament-bg" style="opacity:.06"></div>
+        <div class="ik-hdr-top">
+          <div style="min-width:0">
+            <div id="ik-clock" class="ik-hdr-clock">--:--</div>
+            <div id="ik-hdate" class="ik-hdr-date">Memuat tanggal...</div>
           </div>
-          <button id="home-notif-btn" class="hdr-action" style="background:rgba(255,255,255,.2)" onclick="goNotif()">
+          <button id="home-notif-btn" class="ik-hdr-btn" onclick="goNotif()" aria-label="Notifikasi" title="Notifikasi">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:19px;height:19px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <div id="home-notif-badge" class="nav-badge" style="display:none;top:4px;right:4px"></div>
+            <div id="home-notif-badge" class="nav-badge" style="display:none;top:-3px;right:-3px"></div>
           </button>
         </div>
-        <div id="home-loc-text" style="font-size:12px;color:rgba(255,255,255,.75);margin-bottom:3px">Mendapatkan lokasi...</div>
-        <div id="home-greet" style="font-size:21px;font-weight:800;color:#fff;line-height:1.25;padding-bottom:20px">Assalamualaikum</div>
-        <div id="home-loc-btn-wrap" style="padding-bottom:16px;display:none">
-          <button onclick="getLocation()" style="background:rgba(255,255,255,.2);color:#fff;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            Aktifkan lokasi
-          </button>
-          <p id="home-loc-hint" style="font-size:11px;color:rgba(255,255,255,.6);margin-top:6px">Atau ketik nama kota di kolom pencarian</p>
+        <div class="ik-hdr-loc">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="home-loc-text">Mendapatkan lokasi...</span>
         </div>
+        <div id="home-loc-btn-wrap" style="display:none">
+          <button onclick="getLocation()" class="ik-hdr-locbtn">Aktifkan lokasi</button>
+        </div>
+        <div class="ik-hdr-strip" id="ik-hdr-strip"></div>
       </div>
       <!-- Search -->
       <div id="home-search-wrap" style="padding:14px 16px 0">
@@ -883,36 +961,47 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
         </div>
         <div id="home-results-list"></div>
       </div>
-      <!-- ═══ RESTYLE: Kartu countdown + tabel waktu salat ═══ -->
+      <!-- ═══ Kartu countdown salat (per detik) ═══ -->
       <div id="home-prayer-hero" style="padding:16px 16px 0">
         <div class="ik-count">
-          <div class="ik-count-h" id="ik-count-h">Menuju Ashar</div>
-          <div><span class="ik-count-n" id="ik-count-n">--</span><span class="ik-count-u" id="ik-count-u">mnt</span></div>
+          <div class="ik-count-top">
+            <span class="ik-count-h" id="ik-count-h">Menuju Ashar</span>
+            <span class="ik-count-d" id="ik-count-d"></span>
+          </div>
+          <div class="ik-count-n" id="ik-count-n">--:--:--</div>
           <div class="ik-count-sub"><b id="ik-azan">Azan --:--</b><span id="ik-note"> · Memuat waktu salat...</span></div>
           <div class="ik-bar"><div class="ik-bar-fill" id="ik-bar-fill" style="width:0%"></div><div class="ik-bar-dot" id="ik-bar-dot" style="left:0%"></div></div>
         </div>
+        <div class="ik-tbl-head">
+          <div class="section-title" style="font-size:15px">Waktu Salat Hari Ini</div>
+          <div class="ik-prog"><b id="ik-prog">0/5</b> selesai</div>
+        </div>
         <div class="ik-tbl" id="ik-tbl"></div>
-        <div class="ik-tbl-foot">
-          <div class="ik-prog">Salat hari ini: <b id="ik-prog">0/5</b> selesai</div>
-          <button onclick="goScreen('prayer')" style="font-size:12.5px;font-weight:700;color:var(--p);display:flex;align-items:center;gap:3px">Jadwal lengkap
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px"><polyline points="9 18 15 12 9 6"/></svg>
+        <!-- Last Read -->
+        <div class="ik-lastread" id="ik-lastread" onclick="goScreen('kajian')">
+          <div class="ik-lr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+          <div style="flex:1;min-width:0">
+            <div class="ik-lr-lbl">Kajian Terakhir Dibaca</div>
+            <div class="ik-lr-t" id="ik-lr-t">Belum ada kajian dibaca</div>
+            <div class="ik-lr-s" id="ik-lr-s">Jelajahi kajian terdekat</div>
+          </div>
+          <span class="ik-lr-btn">Lanjut</span>
+        </div>
+        <!-- Utility -->
+        <div class="ik-util">
+          <button class="ik-util-i" onclick="goScreen('qibla')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+            <span>Arah Kiblat</span>
+          </button>
+          <button class="ik-util-i" onclick="goScreen('prayer')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Masjid Terdekat</span>
           </button>
         </div>
       </div>
       <!-- ═══ RESTYLE: Pintasan bulat ═══ -->
       <div id="home-shortcut" style="padding:16px 16px 0">
         <div class="ik-short" id="ik-short"></div>
-      </div>
-      <!-- ═══ RESTYLE: Temukan masjid terdekat ═══ -->
-      <div id="home-mosque-card" style="padding:16px 16px 0">
-        <div class="ik-mosque" onclick="goScreen('prayer')">
-          <div class="ik-mosque-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-          <div style="flex:1;min-width:0">
-            <div class="ik-mosque-t" id="ik-mosque-t">Temukan masjid terdekat</div>
-            <div class="ik-mosque-s" id="ik-mosque-s">Masjid &amp; waktu salat di sekitarmu</div>
-          </div>
-          <svg class="ik-mosque-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
       </div>
       <!-- Nearby -->
       <div style="padding:20px 16px 0">
@@ -1838,6 +1927,13 @@ var qiblaBearing = function(lat,lng) {
 const gantiAhad = s => s.replace(/Minggu/g,'Ahad');
 const fmtDateLong = s => gantiAhad(new Date(s+'T12:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}));
 const fmtDateShort = s => new Date(s+'T12:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+// Tanggal Hijriah (kalender Islam) — fallback aman bila Intl tidak mendukung
+const fmtHijri = s => {
+  try {
+    return new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura',{day:'numeric',month:'long',year:'numeric'})
+      .format(new Date(s+'T12:00:00')).replace(/\s*H$/,'') + ' H';
+  } catch(e) { return ''; }
+};
 const fmtDist = m => m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`;
 const normName = n => n.toLowerCase().replace(/\b(ust\.?|ustadz?|dr\.?|kh\.?|lc\.?|h\.?|hj\.?)\b/gi,'').replace(/\s+/g,' ').trim();
 const getSpeaker = id => DB.speakers.find(s=>s.id===id);
@@ -2282,162 +2378,188 @@ function renderHomePrayerMini() {
 }
 
 // ══════════════════════════════════════════
-// RESTYLE v1.2.0 — Countdown, tabel salat, pintasan
+// ══════════════════════════════════════════
+// v1.3.0 — Header jam/tanggal + countdown per detik
 // ══════════════════════════════════════════
 const IK_NAMES = ['Subuh','Terbit','Dzuhur','Ashar','Maghrib','Isya'];
 const IK_KEYS  = ['Fajr','Sunrise','Dhuhr','Asr','Maghrib','Isha'];
-const IK_PRAY  = ['Subuh','Dzuhur','Ashar','Maghrib','Isya']; // 5 salat (tanpa Terbit)
+const IK_PRAY  = ['Subuh','Dzuhur','Ashar','Maghrib','Isya'];
 const IK_FALLBACK = ['04:30','05:33','11:45','14:48','17:50','18:59'];
 let IK_TIMES = IK_FALLBACK.slice();
 
 function ikMin(t){ const q=String(t||'').substring(0,5).split(':'); const h=parseInt(q[0],10), m=parseInt(q[1],10); return (isNaN(h)||isNaN(m))?0:h*60+m; }
 function ikFmt(m){ m=((Math.round(m)%1440)+1440)%1440; const h=Math.floor(m/60), mi=m%60; return (h<10?'0':'')+h+':'+(mi<10?'0':'')+mi; }
+function ik2(n){ return (n<10?'0':'')+n; }
 
-// Penanda salat yang sudah ditunaikan hari ini (localStorage, per tanggal)
+// Penanda salat selesai per hari (localStorage)
 function ikDoneKey(){ return 'ik_done_' + T; }
 function ikGetDone(){ try{ return JSON.parse(localStorage.getItem(ikDoneKey())||'[]'); }catch(e){ return []; } }
 function ikSetDone(a){ try{ localStorage.setItem(ikDoneKey(), JSON.stringify(a)); }catch(e){} }
 
+// Waktu salat berikutnya (lintas hari bila semua sudah lewat)
+function ikNext(){
+  const now=new Date(), nm=now.getHours()*60+now.getMinutes();
+  let idx=-1;
+  for(let i=0;i<IK_TIMES.length;i++){ if(ikMin(IK_TIMES[i])>nm){ idx=i; break; } }
+  const wrap = idx<0;
+  if(wrap) idx=0;
+  return {idx:idx, wrap:wrap, name:IK_NAMES[idx]};
+}
+
+function ikTick(){
+  const now=new Date();
+  const nm=now.getHours()*60+now.getMinutes();
+
+  // jam besar + tanggal
+  const c=document.getElementById('ik-clock');
+  if(c) c.textContent = ik2(now.getHours())+':'+ik2(now.getMinutes());
+  const hd=document.getElementById('ik-hdate');
+  if(hd) hd.textContent = fmtDateLong(T) + ' · ' + fmtHijri(T);
+
+  const nx=ikNext(), nextIdx=nx.idx;
+  const nextMin = ikMin(IK_TIMES[nextIdx]) + (nx.wrap?1440:0);
+  const curMin  = nm + now.getSeconds()/60;
+  const sisaSec = Math.max(0, Math.round((nextMin-curMin)*60));
+
+  const g=function(id){ return document.getElementById(id); };
+  const hEl=g('ik-count-h'), nEl=g('ik-count-n'), dEl=g('ik-count-d'),
+        azEl=g('ik-azan'), ntEl=g('ik-note'), fEl=g('ik-bar-fill'), bdEl=g('ik-bar-dot');
+
+  if(hEl) hEl.textContent='Menuju '+nx.name;
+  if(nEl){
+    const hh=Math.floor(sisaSec/3600), mm=Math.floor((sisaSec%3600)/60), ss=sisaSec%60;
+    nEl.textContent = ik2(hh)+':'+ik2(mm)+':'+ik2(ss);
+  }
+  if(dEl) dEl.textContent = 'Azan '+ikFmt(nextMin);
+
+  // salat terakhir yang sudah masuk
+  let lastIdx=-1;
+  IK_PRAY.forEach(function(n,i){ const k=IK_NAMES.indexOf(n); if(ikMin(IK_TIMES[k])<=nm) lastIdx=i; });
+  if(azEl) azEl.textContent='Azan '+ikFmt(nextMin);
+  if(ntEl) ntEl.textContent = (lastIdx>=0) ? (' · Salat '+IK_PRAY[lastIdx]+' boleh ditunaikan') : ' · Menunggu waktu Subuh';
+
+  // progress bar
+  const prevIdx=(nextIdx-1+IK_TIMES.length)%IK_TIMES.length;
+  const prevMin=ikMin(IK_TIMES[prevIdx]) + (nextIdx===0 ? -1440 : 0);
+  let prog=(curMin-prevMin)/(nextMin-prevMin);
+  if(!isFinite(prog)) prog=0;
+  prog=Math.max(0,Math.min(1,prog));
+  if(fEl) fEl.style.width=(prog*100).toFixed(2)+'%';
+  if(bdEl) bdEl.style.left=(prog*100).toFixed(2)+'%';
+
+  // deret salat di header
+  const strip=g('ik-hdr-strip');
+  if(strip){
+    const done=ikGetDone();
+    strip.innerHTML = IK_NAMES.map(function(n,i){
+      const k=i, isPray=IK_PRAY.indexOf(n)>-1;
+      const isOn=(i===nextIdx);
+      const isDone=isPray && done.indexOf(n)>-1;
+      const icon=(typeof PRAYER_ICONS!=='undefined'&&isPray)?PRAYER_ICONS[IK_PRAY.indexOf(n)]:'';
+      return '<div class="ik-hs '+(isOn?'on ':'')+(isDone?'done':'')+'">'
+        + '<div class="ik-hs-ic">'+icon+'</div>'
+        + '<div class="ik-hs-nm">'+n+'</div>'
+        + '<div class="ik-hs-tm">'+ikFmt(ikMin(IK_TIMES[k]))+'</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // tabel 6 kolom (bisa diklik untuk tandai selesai)
+  const tbl=g('ik-tbl');
+  if(tbl){
+    const done=ikGetDone();
+    tbl.innerHTML = IK_NAMES.map(function(n,i){
+      const k=i, isPray=IK_PRAY.indexOf(n)>-1;
+      const isOn=(i===nextIdx);
+      const isDone=isPray && done.indexOf(n)>-1;
+      const isPast=ikMin(IK_TIMES[k])<=nm && !isOn;
+      const icon=(typeof PRAYER_ICONS!=='undefined'&&isPray)?PRAYER_ICONS[IK_PRAY.indexOf(n)]:'';
+      const click=isPray?' onclick="ikToggleDone(\''+n+'\')"':'';
+      return '<div class="ik-col '+(isOn?'active ':'')+(isDone?'done':'')+'"'+click+'>'
+        + '<div class="ik-ico">'+icon+'</div>'
+        + '<div class="ik-nm">'+n+'</div>'
+        + '<div class="ik-tm"'+(isPast&&!isDone?' style="opacity:.55"':'')+'>'+ikFmt(ikMin(IK_TIMES[k]))+'</div>'
+        + '<div class="ik-dot"></div>'
+        + (isOn?'<div class="ik-nx">BERIKUTNYA</div>':'')
+        + '</div>';
+    }).join('');
+  }
+
+  const pr=g('ik-prog');
+  if(pr) pr.textContent = ikGetDone().filter(function(n){ return IK_PRAY.indexOf(n)>-1; }).length + '/5';
+}
+
+function ikToggleDone(nm){
+  if(IK_PRAY.indexOf(nm)<0) return;
+  const d=ikGetDone(), i=d.indexOf(nm);
+  if(i>-1){ d.splice(i,1); } else { d.push(nm); }
+  ikSetDone(d);
+  ikTick();
+  showToast(i>-1 ? (nm+' dibatalkan') : (nm+' ditandai selesai'), 's');
+}
+
+function ikFetchTimes(){
+  if(!state.location) return;
+  const ts=Math.floor(Date.now()/1000);
+  fetch('https://api.aladhan.com/v1/timings/'+ts+'?latitude='+state.location.lat+'&longitude='+state.location.lng+'&method=20')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!(d.data&&d.data.timings)) return;
+      const tt=d.data.timings;
+      const arr=IK_KEYS.map(function(k){ return String(tt[k]||'').split(' ')[0]; }).filter(Boolean);
+      if(arr.length===6){ IK_TIMES=arr; ikTick(); }
+    }).catch(function(){});
+}
+
 function ikRenderShortcut(){
-  const el = document.getElementById('ik-short'); if(!el) return;
-  const items = [
+  const el=document.getElementById('ik-short'); if(!el) return;
+  const items=[
     {l:'Kajian',   s:'kajian',   p:'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'},
     {l:'Sholat',   s:'prayer',   p:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'},
     {l:'Kiblat',   s:'qibla',    p:'<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>'},
     {l:'Pengingat',s:'reminders',p:'<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'},
     {l:'Simpan',   s:'saved',    p:'<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>'}
   ];
-  el.innerHTML = items.map(function(it){
+  el.innerHTML=items.map(function(it){
     return '<div class="ik-short-i" onclick="goScreen(\''+it.s+'\')">'
       + '<div class="ik-short-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">'+it.p+'</svg></div>'
       + '<div class="ik-short-l">'+it.l+'</div></div>';
   }).join('');
 }
 
-function ikRender(){
-  const now = new Date();
-  const nowMin = now.getHours()*60 + now.getMinutes();
-  const times = IK_TIMES;
-
-  // waktu berikutnya (lintas hari bila semua sudah lewat)
-  let nextIdx = -1;
-  for(let i=0;i<times.length;i++){ if(ikMin(times[i]) > nowMin){ nextIdx=i; break; } }
-  const wrapNext = (nextIdx < 0);
-  if(wrapNext) nextIdx = 0;
-  const nextMin = ikMin(times[nextIdx]) + (wrapNext?1440:0);
-  const target  = IK_NAMES[nextIdx];
-
-  // salat terakhir yang sudah masuk
-  let lastIdx = -1;
-  IK_PRAY.forEach(function(nm,i){ const k=IK_NAMES.indexOf(nm); if(ikMin(times[k]) <= nowMin) lastIdx=i; });
-
-  const g = function(id){ return document.getElementById(id); };
-  const hEl=g('ik-count-h'), nEl=g('ik-count-n'), uEl=g('ik-count-u'),
-        azEl=g('ik-azan'), ntEl=g('ik-note'), fEl=g('ik-bar-fill'), dEl=g('ik-bar-dot');
-
-  if(hEl) hEl.textContent = 'Menuju ' + target;
-  const diff = nextMin - nowMin;
-  let val, unit;
-  if(diff >= 60){ val = Math.floor(diff/60); unit = 'jam'; } else { val = diff; unit = 'mnt'; }
-  if(nEl) nEl.textContent = val;
-  if(uEl) uEl.textContent = unit;
-  if(azEl) azEl.textContent = 'Azan ' + ikFmt(nextMin);
-  if(ntEl) ntEl.textContent = (lastIdx>=0)
-      ? (' · Salat ' + IK_PRAY[lastIdx] + ' boleh ditunaikan')
-      : ' · Menunggu waktu Subuh';
-
-  const prevIdx = (nextIdx - 1 + times.length) % times.length;
-  const prevMin = ikMin(times[prevIdx]) + (nextIdx===0 ? -1440 : 0);
-  let prog = (nowMin - prevMin) / (nextMin - prevMin);
-  if(!isFinite(prog)) prog = 0;
-  prog = Math.max(0, Math.min(1, prog));
-  if(fEl) fEl.style.width = (prog*100).toFixed(1)+'%';
-  if(dEl) dEl.style.left  = (prog*100).toFixed(1)+'%';
-
-  const tbl = g('ik-tbl');
-  if(tbl){
-    const done = ikGetDone();
-    tbl.innerHTML = IK_NAMES.map(function(nm,i){
-      const k = i;   // IK_NAMES / times / IK_KEYS sejajar (6 kolom)
-      const isPray = IK_PRAY.indexOf(nm) > -1;
-      const isNext = (i === nextIdx);
-      const isDone = isPray && done.indexOf(nm) > -1;
-      const isPast = ikMin(times[k]) <= nowMin && !isNext;
-      const icon = (typeof PRAYER_ICONS !== 'undefined' && isPray) ? PRAYER_ICONS[IK_PRAY.indexOf(nm)] : '';
-      const click = isPray ? ' onclick="ikToggleDone(\''+nm+'\')"' : '';
-      return '<div class="ik-col '+(isNext?'active ':'')+(isDone?'done':'')+'"'+click+'>'
-        + '<div class="ik-ico">'+icon+'</div>'
-        + '<div class="ik-nm">'+nm+'</div>'
-        + '<div class="ik-tm"'+(isPast&&!isDone?' style="opacity:.55"':'')+'>'+ikFmt(ikMin(times[k]))+'</div>'
-        + '<div class="ik-dot"></div>'
-        + (isNext?'<div class="ik-nx">BERIKUTNYA</div>':'')
-        + '</div>';
-    }).join('');
-  }
-
-  const pr = g('ik-prog');
-  if(pr) pr.textContent = ikGetDone().filter(function(n){ return IK_PRAY.indexOf(n)>-1; }).length + '/5';
-
-  const mt=g('ik-mosque-t'), ms=g('ik-mosque-s');
-  if(mt && ms){
-    let mq=null, dist=null;
-    if(state.location && DB.mosques && DB.mosques.length){
-      DB.mosques.forEach(function(m){
-        if(m.lat==null || m.lng==null) return;
-        const d = haversine(state.location.lat, state.location.lng, m.lat, m.lng);
-        if(dist===null || d<dist){ dist=d; mq=m; }
-      });
-    }
-    if(mq){
-      mt.textContent = mq.name;
-      ms.textContent = (dist<1000 ? Math.round(dist)+' m' : (dist/1000).toFixed(1)+' km')
-        + ' dari lokasi kamu · ' + ikFmt(nextMin) + ' ' + target;
-    } else {
-      mt.textContent = 'Temukan masjid terdekat';
-      ms.textContent = 'Masjid & waktu salat di sekitarmu';
-    }
+// Kartu "Kajian Terakhir Dibaca" — pakai bookmark/riwayat nyata
+function ikLastRead(){
+  const tEl=document.getElementById('ik-lr-t'), sEl=document.getElementById('ik-lr-s');
+  if(!tEl||!sEl) return;
+  let k=null;
+  if(state.currentKajianId && DB.kajian) k=DB.kajian.find(function(x){ return x.id===state.currentKajianId; });
+  if(!k && state.bookmarks && state.bookmarks.length && DB.kajian)
+    k=DB.kajian.find(function(x){ return x.id===state.bookmarks[state.bookmarks.length-1]; });
+  if(k){
+    const mq=(typeof getMosque==='function')?getMosque(k.mosque_id):null;
+    tEl.textContent=k.title||'Kajian';
+    sEl.textContent=(mq&&mq.name?mq.name:'')+(k.date?((mq&&mq.name?' · ':'')+fmtDateShort(k.date)):'');
+  } else {
+    tEl.textContent='Belum ada kajian dibaca';
+    sEl.textContent='Jelajahi kajian terdekat';
   }
 }
 
-// Klik kolom salat = tandai/batalkan selesai
-function ikToggleDone(nm){
-  if(IK_PRAY.indexOf(nm) < 0) return;   // kolom Terbit tidak bisa ditandai
-  const d = ikGetDone();
-  const i = d.indexOf(nm);
-  if(i > -1){ d.splice(i,1); } else { d.push(nm); }
-  ikSetDone(d);
-  ikRender();
-  showToast(i > -1 ? (nm+' dibatalkan') : (nm+' ditandai selesai'), 's');
-}
-
-function ikFetchTimes(){
-  if(!state.location) return;
-  const ts = Math.floor(Date.now()/1000);
-  fetch('https://api.aladhan.com/v1/timings/'+ts+'?latitude='+state.location.lat+'&longitude='+state.location.lng+'&method=20')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if(!(d.data && d.data.timings)) return;
-      const tt = d.data.timings;
-      const arr = IK_KEYS.map(function(k){ return String(tt[k]||'').split(' ')[0]; }).filter(Boolean);
-      if(arr.length === 6){ IK_TIMES = arr; ikRender(); }
-    }).catch(function(){});
+function ikSetHomeSections(show){
+  ['home-prayer-hero','home-shortcut'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e) e.style.display = show ? '' : 'none';
+  });
 }
 
 function renderHomeExtras(){
   ikRenderShortcut();
-  ikRender();
+  ikLastRead();
+  ikTick();
   ikFetchTimes();
   if(!window._ikTimer){
-    window._ikTimer = setInterval(function(){ try{ ikRender(); }catch(e){} }, 30000);
+    window._ikTimer=setInterval(function(){ try{ ikTick(); }catch(e){} }, 1000);
   }
-}
-
-// Sembunyikan/tampilkan blok restyle saat pencarian home aktif
-function ikSetHomeSections(show){
-  ['home-prayer-hero','home-shortcut','home-mosque-card'].forEach(function(id){
-    var e = document.getElementById(id);
-    if(e) e.style.display = show ? '' : 'none';
-  });
 }
 
 function renderHome() {
