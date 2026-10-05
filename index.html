@@ -2920,125 +2920,199 @@ function ikPosterEsc(s){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-/* Bungkus teks jadi beberapa baris (SVG tidak punya auto-wrap).
-   maxChars = perkiraan jumlah karakter per baris. */
-function ikPosterWrap(text, maxChars, maxLines){
+/* Ukur lebar teks pakai canvas supaya wrapping akurat (bukan tebakan). */
+var _ikMC = null;
+function ikMeasure(text, fs, weight, family){
+  if (!_ikMC) _ikMC = document.createElement('canvas').getContext('2d');
+  _ikMC.font = (weight||'700') + ' ' + fs + 'px ' + family;
+  return _ikMC.measureText(String(text==null?'':text)).width;
+}
+
+/* Bungkus teks berdasarkan LEBAR PIXEL sebenarnya. */
+function ikWrapPx(text, fs, weight, family, maxW, maxLines){
   var words = String(text==null?'':text).split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
   var lines = [], cur = '';
   for (var i=0;i<words.length;i++){
-    var w = words[i], test = cur ? cur+' '+w : w;
-    if (test.length > maxChars && cur){ lines.push(cur); cur = w; }
-    else cur = test;
-    if (maxLines && lines.length >= maxLines) break;
+    var test = cur ? cur + ' ' + words[i] : words[i];
+    if (ikMeasure(test, fs, weight, family) > maxW && cur){
+      lines.push(cur);
+      cur = words[i];
+      if (maxLines && lines.length >= maxLines) break;
+    } else cur = test;
   }
   if (cur && (!maxLines || lines.length < maxLines)) lines.push(cur);
   if (!lines.length) lines = [''];
-  // kalau dipotong, tambahkan elipsis di baris terakhir
+  // ellipsis kalau teks dipotong
   if (maxLines && lines.length === maxLines){
-    var total = words.join(' ');
-    var shown = lines.join(' ');
-    if (total.length > shown.length) lines[maxLines-1] = lines[maxLines-1].replace(/\s*\S*$/,'') + '…';
+    var shown = lines.join(' ').length;
+    if (words.join(' ').length > shown){
+      var last = lines[maxLines-1];
+      while (last.length > 1 && ikMeasure(last+'…', fs, weight, family) > maxW) last = last.slice(0,-1);
+      lines[maxLines-1] = last + '…';
+    }
   }
   return lines;
 }
 
-/* Ikon garis monoline (sama gaya dengan ikon di web) */
-function ikPIcon(name, x, y, size, color){
+/* Ikon garis monoline (gaya sama dengan ikon web) */
+function ikPIcon(name, x, y, size, color, sw){
   var paths = {
     book:     '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
     calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>',
     clock:    '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-    pin:      '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'
+    pin:      '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    instagram:'<rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1.1" fill="'+color+'" stroke="none"/>'
   };
   var sc = size/24;
-  return '<g transform="translate('+x+','+y+') scale('+sc+')" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||'')+'</g>';
+  return '<g transform="translate('+x+','+y+') scale('+sc+')" fill="none" stroke="'+color+'" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||'')+'</g>';
 }
 
-/* Susun string SVG poster.
-   Konten (judul + baris info) dibangun dengan koordinat lokal mulai y=0,
-   lalu DIGESER agar seimbang secara vertikal di antara pill atas dan footer.
-   Ini menghindari area kosong besar di tengah poster. */
+/* Busur arch (setengah lingkaran + kaki lurus) sebagai path SVG. */
+function ikArchPath(cx, topY, r, legY){
+  var y0 = topY + r;   // pusat lingkaran
+  return 'M ' + (cx-r) + ' ' + legY
+       + ' L ' + (cx-r) + ' ' + y0
+       + ' A ' + r + ' ' + r + ' 0 0 1 ' + (cx+r) + ' ' + y0
+       + ' L ' + (cx+r) + ' ' + legY + ' Z';
+}
+
+/* Tanggal format poster: "Rabu, 7 Okt 2026" */
+function ikPosterDate(s){
+  try {
+    var d = new Date(s+'T12:00:00');
+    var wd = ['Ahad','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()];
+    var mo = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][d.getMonth()];
+    return wd + ', ' + d.getDate() + ' ' + mo + ' ' + d.getFullYear();
+  } catch(e){ return String(s||''); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Poster kajian — layout editorial minimalis (mengikuti referensi desain):
+   brand + pill topik di atas, judul besar, pembicara, divider, baris
+   2 kolom (Tanggal | Waktu), Lokasi + alamat, grafis arch + bulan sabit
+   di kanan atas, kontributor kecil di pojok kanan bawah.
+
+   Konten disusun sebagai DAFTAR BLOK dengan tinggi terukur, lalu jarak
+   antar-blok dihitung dinamis agar mengisi tinggi poster secara merata
+   (tidak top-heavy / tidak ada lubang kosong besar di bawah).
+   ══════════════════════════════════════════════════════════════════════ */
 function ikPosterSVGString(k){
   var spk = getSpeaker(k.speaker_id), msq = getMosque(k.mosque_id);
   var sub = DB.users.find(function(u){ return u.id === k.submitted_by; });
 
-  var W=1080, H=1350, PAD=76;
-  var IC='#3F7D50', TXT='#1F3128', MUT='#5F7A6C', LN='#D2E5DA', PL='#EAF7EA', BG='#F4FBF4';
-  var FF="system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
-  var head=[], body=[];
-  var cy = 0;   // kursor vertikal LOKAL untuk blok konten
+  var W=1080, H=1350, PAD=96;
+  // Palet diukur langsung dari referensi desain (piksel)
+  var BG='#F4F9F0', TEAL='#14352A', GREEN='#2E7D55', MUT='#7A9A86';
+  var PILL='#DDF0D9', ARCH_OUT='#DDF0D9', ARCH_IN='#AFE1AF', DIV='#D6EDD3';
+  var FF="'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+  var CW = W - 2*PAD;              // lebar kolom konten = 888
 
-  // ── Judul kajian ──
-  var titleLines = ikPosterWrap(k.title, 22, 3);
-  var TLH = 88, TFS = 72;
-  head.push('<text font-family="'+FF+'" font-size="'+TFS+'" font-weight="800" fill="'+TXT+'">');
-  titleLines.forEach(function(ln,i){
-    head.push('<tspan x="'+PAD+'" y="'+(cy + TFS + i*TLH)+'">'+ikPosterEsc(ln)+'</tspan>');
-  });
-  head.push('</text>');
-  cy += TFS + (titleLines.length-1)*TLH + 54;   // dasar judul + jarak
+  // ── Siapkan teks (ukur dulu supaya tinggi blok diketahui) ──
+  var tfs = 88, titleLines = null;
+  while (tfs >= 52){
+    var pr = ikWrapPx(k.title, tfs, '800', FF, 540, 999);
+    if (pr.length <= 3){ titleLines = pr; break; }
+    tfs -= 4;
+  }
+  if (!titleLines) titleLines = ikWrapPx(k.title, 52, '800', FF, 540, 3);
+  var TLH = tfs * 1.14;
 
-  head.push('<line x1="'+PAD+'" y1="'+cy+'" x2="'+(W-PAD)+'" y2="'+cy+'" stroke="'+LN+'" stroke-width="2"/>');
-  cy += 56;
+  var nameLines = msq ? ikWrapPx(msq.name, 34, '700', FF, CW, 2) : [];
+  var addrLines = (msq && msq.address) ? ikWrapPx(msq.address, 26, '500', FF, CW, 3) : [];
 
-  // ── Baris info ──
-  var rows=[];
-  if (spk) rows.push({icon:'book', label:'PEMBICARA', val: spk.full_name + (spk.verified?' ✓':'')});
-  rows.push({icon:'calendar', label:'TANGGAL', val: fmtDateLong(k.date)});
-  rows.push({icon:'clock', label:'WAKTU', val: k.time + ' WIB'});
-  if (msq) rows.push({icon:'pin', label:'LOKASI', val: msq.name});
+  // ── Blok konten: {h: tinggi, draw: fn(y) -> string} ──
+  var blocks = [];
 
-  var ICON=82, GAP=46;
-  rows.forEach(function(r,idx){
-    body.push('<rect x="'+PAD+'" y="'+cy+'" width="'+ICON+'" height="'+ICON+'" rx="24" fill="'+PL+'"/>');
-    body.push(ikPIcon(r.icon, PAD+(ICON-44)/2, cy+(ICON-44)/2, 44, IC));
-    body.push('<text x="'+(PAD+ICON+28)+'" y="'+(cy+28)+'" font-family="'+FF+'" font-size="20" font-weight="700" fill="'+MUT+'" letter-spacing="1.7">'+r.label+'</text>');
-    var vl = ikPosterWrap(r.val, 31, 2);
-    body.push('<text font-family="'+FF+'" font-size="33" font-weight="700" fill="'+TXT+'">');
-    vl.forEach(function(ln,i){
-      body.push('<tspan x="'+(PAD+ICON+28)+'" y="'+(cy+66+i*40)+'">'+ikPosterEsc(ln)+'</tspan>');
+  blocks.push({ h: titleLines.length*TLH, draw: function(y){
+    var s = '<text font-family="'+FF+'" font-size="'+tfs+'" font-weight="800" fill="'+TEAL+'">';
+    titleLines.forEach(function(ln,i){
+      s += '<tspan x="'+PAD+'" y="'+(y + tfs*0.80 + i*TLH)+'">'+ikPosterEsc(ln)+'</tspan>';
     });
-    body.push('</text>');
-    var rowH = Math.max(ICON, 66 + (vl.length-1)*40);
-    cy += rowH + (idx < rows.length-1 ? GAP : 0);
+    return s + '</text>';
+  }});
+
+  if (spk) blocks.push({ h: 46, draw: function(y){
+    return '<text x="'+PAD+'" y="'+(y+32)+'" font-family="'+FF+'" font-size="32" font-weight="600" fill="'+GREEN+'">'+ikPosterEsc(spk.full_name)+'</text>';
+  }});
+
+  blocks.push({ h: 2, draw: function(y){
+    return '<line x1="'+PAD+'" y1="'+y+'" x2="'+(W-PAD)+'" y2="'+y+'" stroke="'+DIV+'" stroke-width="2"/>';
+  }});
+
+  blocks.push({ h: 108, draw: function(y){
+    var lfs=23, vfs=31, COL2=596;
+    return '<text x="'+PAD+'" y="'+(y+lfs)+'" font-family="'+FF+'" font-size="'+lfs+'" font-weight="700" fill="'+MUT+'">Tanggal</text>'
+         + '<text x="'+COL2+'" y="'+(y+lfs)+'" font-family="'+FF+'" font-size="'+lfs+'" font-weight="700" fill="'+MUT+'">Waktu</text>'
+         + '<text x="'+PAD+'" y="'+(y+108)+'" font-family="'+FF+'" font-size="'+vfs+'" font-weight="700" fill="'+TEAL+'">'+ikPosterEsc(ikPosterDate(k.date))+'</text>'
+         + '<text x="'+COL2+'" y="'+(y+108)+'" font-family="'+FF+'" font-size="'+vfs+'" font-weight="700" fill="'+TEAL+'">'+ikPosterEsc(String(k.time||'-').replace(':','.'))+' WIB</text>';
+  }});
+
+  if (msq) blocks.push({ h: 26 + 46 + nameLines.length*44 + (addrLines.length ? 46 + addrLines.length*36 : 0), draw: function(y){
+    var s = '<text x="'+PAD+'" y="'+(y+26)+'" font-family="'+FF+'" font-size="23" font-weight="700" fill="'+MUT+'">Lokasi</text>';
+    s += '<text font-family="'+FF+'" font-size="34" font-weight="700" fill="'+TEAL+'">';
+    nameLines.forEach(function(ln,i){ s += '<tspan x="'+PAD+'" y="'+(y+26+46+i*44)+'">'+ikPosterEsc(ln)+'</tspan>'; });
+    s += '</text>';
+    if (addrLines.length){
+      var ay = y + 26 + 46 + (nameLines.length-1)*44 + 46;
+      s += '<text font-family="'+FF+'" font-size="26" font-weight="500" fill="'+MUT+'">';
+      addrLines.forEach(function(ln,i){ s += '<tspan x="'+PAD+'" y="'+(ay+i*36)+'">'+ikPosterEsc(ln)+'</tspan>'; });
+      s += '</text>';
+    }
+    return s;
+  }});
+
+  // ── Jarak antar-blok dinamis supaya konten mengisi tinggi secara merata ──
+  var topY = 392, botY = 1222;
+  var totalH = blocks.reduce(function(a,b){ return a + b.h; }, 0);
+  var nGap = Math.max(1, blocks.length - 1);
+  var slack = botY - topY - totalH;
+  var gap = Math.max(16, Math.min(104, slack / nGap));
+  var used = totalH + gap*(blocks.length-1);
+  var offset = Math.max(0, (botY - topY - used) / 2);   // sisa ekstra -> seimbang
+
+  var content = '', y = topY + offset;
+  blocks.forEach(function(b,i){
+    content += b.draw(y);
+    y += b.h + (i < blocks.length-1 ? gap : 0);
   });
 
-  // ── Posisi vertikal: seimbangkan blok konten ──
-  var contentH = cy;                      // tinggi total blok konten
-  var topLimit = 232;                     // batas atas (di bawah pill)
-  var footerLineY = H - 132;              // garis footer
-  var botLimit = footerLineY - 40;        // batas bawah konten
-  var avail = botLimit - topLimit;
-  var dy = topLimit + Math.max(0, (avail - contentH)/2);
-  if (contentH > avail) dy = topLimit;    // kalau kepanjangan, tempel atas
-
+  // ── Rakit poster ──
   var o=[];
   o.push('<rect width="'+W+'" height="'+H+'" fill="'+BG+'"/>');
-  o.push('<circle cx="1010" cy="120" r="210" fill="'+PL+'" opacity="0.7"/>');
-  o.push('<circle cx="70" cy="1240" r="180" fill="'+PL+'" opacity="0.6"/>');
-  o.push('<defs><linearGradient id="ikg" x1="0" y1="0" x2="1" y2="0">'
-        +'<stop offset="0" stop-color="#AFE1AF"/><stop offset="1" stop-color="#8FCC8F"/>'
-        +'</linearGradient></defs>');
-  o.push('<rect width="'+W+'" height="14" fill="url(#ikg)"/>');
 
-  // Brand pill
-  var y0=120;
-  o.push('<rect x="'+PAD+'" y="'+y0+'" width="236" height="56" rx="28" fill="'+PL+'"/>');
-  o.push('<text x="'+(PAD+118)+'" y="'+(y0+37)+'" text-anchor="middle" font-family="'+FF+'" font-size="21" font-weight="800" fill="'+IC+'" letter-spacing="2.5">INFO KAJIAN</text>');
-  // Topik pill
+  // Grafis arch + bulan sabit (kanan atas)
+  var CXO=848, CXI=860;
+  o.push('<path d="'+ikArchPath(CXO, 46, 168, 470)+'" fill="'+ARCH_OUT+'"/>');
+  o.push('<path d="'+ikArchPath(CXI, 104, 112, 362)+'" fill="'+ARCH_IN+'"/>');
+  o.push('<circle cx="'+(CXI-6)+'" cy="156" r="34" fill="#FFFFFF"/>');
+  o.push('<circle cx="'+(CXI+14)+'" cy="146" r="29" fill="'+ARCH_IN+'"/>');
+
+  // Brand + pill topik
+  o.push('<text x="'+PAD+'" y="122" font-family="'+FF+'" font-size="31" font-weight="800" fill="'+GREEN+'">infokajian.app</text>');
   var topic = k.topic || 'Kajian';
-  var tw = Math.min(330, 50 + topic.length*13);
-  o.push('<rect x="'+(W-PAD-tw)+'" y="'+y0+'" width="'+tw+'" height="56" rx="28" fill="#fff" stroke="'+LN+'" stroke-width="2"/>');
-  o.push('<text x="'+(W-PAD-tw/2)+'" y="'+(y0+37)+'" text-anchor="middle" font-family="'+FF+'" font-size="21" font-weight="700" fill="'+MUT+'">'+ikPosterEsc(topic)+'</text>');
+  var tw = ikMeasure(topic, 24, '700', FF) + 58;
+  o.push('<rect x="'+PAD+'" y="150" width="'+tw+'" height="58" rx="29" fill="'+PILL+'"/>');
+  o.push('<text x="'+(PAD+tw/2)+'" y="188" text-anchor="middle" font-family="'+FF+'" font-size="24" font-weight="700" fill="'+TEAL+'">'+ikPosterEsc(topic)+'</text>');
 
-  // Blok konten (judul + baris), digeser seimbang
-  o.push('<g transform="translate(0,'+Math.round(dy)+')">'+head.join('')+body.join('')+'</g>');
+  o.push(content);
 
-  // Footer
-  o.push('<line x1="'+PAD+'" y1="'+footerLineY+'" x2="'+(W-PAD)+'" y2="'+footerLineY+'" stroke="'+LN+'" stroke-width="2"/>');
-  o.push('<text x="'+PAD+'" y="'+(footerLineY+56)+'" font-family="'+FF+'" font-size="27" font-weight="800" fill="'+IC+'">infokajian.app</text>');
+  // Sumber (kalau masjid punya akun IG) — di tengah bawah
+  var ig = msq && (msq.instagram || msq.ig);
+  if (ig){
+    var handle = String(ig).replace(/^@/,'');
+    var label = 'Sumber:';
+    var lw = ikMeasure(label,25,'600',FF);
+    var hw = ikMeasure('@'+handle,25,'700',FF);
+    var sx = (W - (lw + 44 + hw))/2, sy = 1272;
+    o.push('<text x="'+sx+'" y="'+sy+'" font-family="'+FF+'" font-size="25" font-weight="600" fill="'+MUT+'">'+label+'</text>');
+    o.push(ikPIcon('instagram', sx+lw+10, sy-21, 26, GREEN, 1.9));
+    o.push('<text x="'+(sx+lw+44)+'" y="'+sy+'" font-family="'+FF+'" font-size="25" font-weight="700" fill="'+GREEN+'">'+ikPosterEsc('@'+handle)+'</text>');
+  }
+
+  // Kontributor kecil, pojok kanan bawah
   if (sub && sub.name){
-    o.push('<text x="'+(W-PAD)+'" y="'+(footerLineY+56)+'" text-anchor="end" font-family="'+FF+'" font-size="19" font-weight="600" fill="'+MUT+'">'+ikPosterEsc('oleh ' + sub.name)+'</text>');
+    o.push('<text x="'+(W-PAD)+'" y="1314" text-anchor="end" font-family="'+FF+'" font-size="18" font-weight="600" fill="'+MUT+'">'+ikPosterEsc('oleh '+sub.name)+'</text>');
   }
 
   return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+o.join('')+'</svg>';
