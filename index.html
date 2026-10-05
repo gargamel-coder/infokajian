@@ -2987,6 +2987,122 @@ function ikArchPath(pts, cx, legY){
   return s;
 }
 
+/* Ringkas alamat jadi "Kecamatan, Kota" saja (untuk poster).
+   Alamat masjid di data sangat bervariasi: ada singkatan (Kec., Kby., Pd.),
+   bahasa Inggris (East Jakarta City), tanda hubung, tanpa koma, bahkan
+   hanya kota saja. Karena itu dipakai bertingkat dan tahan gagal. */
+var IK_KOTA = ['Jakarta Pusat','Jakarta Selatan','Jakarta Timur','Jakarta Barat','Jakarta Utara',
+  'Yogyakarta','Surakarta','Surabaya','Semarang','Bandung','Bekasi','Tangerang','Depok','Bogor','Malang','Medan'];
+
+/* Awalan yang menandakan bagian itu BUKAN nama kecamatan
+   (nama jalan/tempat/bangunan). Catatan: 'taman' TIDAK dibanned
+   karena 'Taman Sari' adalah nama kecamatan di Jakarta Barat. */
+var IK_BUKAN_KEC = ['jl','jalan','gg','gang','no','nomor','blok','rt','rw','lantai','kav','kavling',
+  'komplek','kompleks','perumahan','desa','kelurahan','gedung','pasar','mall','plaza','terminal',
+  'stasiun','bandara','kampus','universitas','alun-alun','alun','kota','kabupaten','kecamatan','ruko','masjid'];
+
+function ikShortAddress(addr){
+  if (!addr) return '';
+  var s = ' ' + String(addr).replace(/\s+/g,' ') + ' ';
+
+  // 1. normalisasi singkatan & istilah asing
+  var norm = [
+    [/\bKby\.?\s*Baru\b/gi,'Kebayoran Baru'], [/\bKby\.?\s*Lama\b/gi,'Kebayoran Lama'],
+    [/\bKby\.?\b/gi,'Kebayoran'],
+    [/\bKec\b\.?\s*/gi,'Kecamatan '], [/\bKel\b\.?\s*/gi,'Kelurahan '],
+    [/\bPd\.?\s*Klp\.?\b/gi,'Pondok Kelapa'], [/\bPd\.?\b/gi,'Pondok'],
+    [/\bBar\.?\b/gi,'Barat'], [/\bTim\.?\b/gi,'Timur'], [/\bSel\.?\b/gi,'Selatan'], [/\bUt\.?\b/gi,'Utara'],
+    [/\bEast Jakarta City\b/gi,'Kota Jakarta Timur'], [/\bSouth Jakarta City\b/gi,'Kota Jakarta Selatan'],
+    [/\bWest Jakarta City\b/gi,'Kota Jakarta Barat'], [/\bNorth Jakarta City\b/gi,'Kota Jakarta Utara'],
+    [/\bCentral Jakarta City\b/gi,'Kota Jakarta Pusat'],
+    [/\bBogor Regency\b/gi,'Kota Bogor'], [/\bBekasi Regency\b/gi,'Kota Bekasi'],
+    [/\bWest Java\b/gi,'Jawa Barat']
+  ];
+  for (var i=0;i<norm.length;i++) s = s.replace(norm[i][0], norm[i][1]);
+
+  // 2. buang kode pos, provinsi, RT/RW, nomor rumah, blok, lantai
+  s = s.replace(/\b\d{5}\b/g,' ')
+       .replace(/Daerah Khusus[^,]*/gi,' ')
+       .replace(/\bJawa Barat\b|\bDKI Jakarta\b|\bIndonesia\b/gi,' ')
+       .replace(/\bRT\b[\s.:]*\d+[^,.!]*/gi,' ')
+       .replace(/\bRW\b[\s.:]*\d+/gi,' ')
+       .replace(/\bNo\b\.?\s*[\dA-Za-z\-]+/gi,' ')
+       .replace(/\bBlok\b\.?\s*[\dA-Za-z]+/gi,' ')
+       .replace(/\blantai\s*\d+/gi,' ')
+       .replace(/\b\d+[A-Za-z]?\b/g,' ');
+
+  // 3. pisah per koma DAN per tanda hubung berpemisah spasi
+  var parts = s.split(/[,.]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var out = [];
+  for (var pi=0; pi<parts.length; pi++){
+    var sub = parts[pi].split(/\s+-\s+/);
+    for (var sj=0; sj<sub.length; sj++){ if (sub[sj].trim()) out.push(sub[sj].trim()); }
+  }
+  parts = out;
+
+  // 4. cari kota: utamakan bagian yang DIAWALI "Kota/Kabupaten",
+  //    lalu yang persis sama, terakhir yang memuat (dari kanan).
+  var kota = null, kotaIdx = -1;
+  for (var ki=0; ki<IK_KOTA.length && !kota; ki++){
+    var K = IK_KOTA[ki], re = new RegExp('^(Kota|Kabupaten)\\s+'+K.replace(/ /g,'\\s+')+'$','i');
+    for (var a=0;a<parts.length;a++){ if (re.test(parts[a])){ kota=K; kotaIdx=a; break; } }
+  }
+  if (!kota){
+    for (var ki2=0; ki2<IK_KOTA.length && !kota; ki2++){
+      var K2=IK_KOTA[ki2], re2=new RegExp('^'+K2.replace(/ /g,'\\s+')+'$','i');
+      for (var b=0;b<parts.length;b++){ if (re2.test(parts[b])){ kota=K2; kotaIdx=b; break; } }
+    }
+  }
+  if (!kota){
+    for (var ki3=0; ki3<IK_KOTA.length && !kota; ki3++){
+      var K3=IK_KOTA[ki3], re3=new RegExp('\\b'+K3.replace(/ /g,'\\s+')+'\\b','i');
+      for (var c=parts.length-1;c>=0;c--){ if (re3.test(parts[c])){ kota=K3; kotaIdx=c; break; } }
+    }
+  }
+
+  // 5. cari kecamatan
+  var kec = null;
+  for (var q=0;q<parts.length;q++){
+    var m = parts[q].match(/^Kecamatan\s+(.+)$/i);
+    if (m && ikKecValid(m[1])){ kec = m[1].trim(); break; }
+  }
+  if (!kec && kotaIdx > 0){
+    // Pada alamat Indonesia, kecamatan selalu bagian TEPAT SEBELUM kota.
+    // Jangan mencari lebih jauh ke belakang: kalau bagian itu bukan nama
+    // kecamatan, lebih baik tampilkan kota saja daripada salah menampilkan
+    // nama jalan (mis. "Dalem Kaum, Bandung").
+    if (ikKecValid(parts[kotaIdx-1])) kec = parts[kotaIdx-1];
+  }
+  if (!kec && kotaIdx < 0 && parts.length){
+    // tidak ada kota terdeteksi: pakai bagian terakhir bila wajar
+    if (ikKecValid(parts[parts.length-1])) kec = parts[parts.length-1];
+  }
+
+  if (kec && kota) return kec + ', ' + kota;
+  if (kota) return kota;
+  if (kec) return kec;
+  return parts.length ? parts[parts.length-1] : '';
+}
+
+function ikKecValid(x){
+  if (!x) return false;
+  var s = String(x).trim();
+  if (s.length < 3 || s.length > 34) return false;
+  if (/^\d+$/.test(s)) return false;
+  // Nama kecamatan di Indonesia hampir selalu 1-2 kata (mis. "Kebayoran
+  // Baru", "Duren Sawit", "Setiabudi"). Frasa 3 kata hampir pasti nama
+  // jalan/tempat (mis. "Alternatif Cibubur Cileungsi"), jadi ditolak.
+  if (s.split(/\s+/).length > 2) return false;
+  var low = s.toLowerCase();
+  for (var i=0;i<IK_BUKAN_KEC.length;i++){
+    var w = IK_BUKAN_KEC[i];
+    if (low === w) return false;
+    // tolak awalan yang diikuti spasi ATAU tanda hubung (mis. "alun-alun")
+    if (low.indexOf(w + ' ') === 0 || low.indexOf(w + '-') === 0) return false;
+  }
+  return true;
+}
+
 /* Tanggal format poster: "Rabu, 7 Okt 2026" */
 function ikPosterDate(s){
   try {
@@ -3037,7 +3153,8 @@ function ikPosterSVGString(k){
   var SH = afterTitle - 601;     // geser elemen bawah kalau judul bukan 2 baris
 
   var nameLines = msq ? ikWrapPx(msq.name, 40, '700', FF, CW, 2) : [];
-  var addrLines = (msq && msq.address) ? ikWrapPx(msq.address, 30, '500', FF, CW, 2) : [];
+  var addrShort = msq ? ikShortAddress(msq.address) : '';
+  var addrLines = addrShort ? ikWrapPx(addrShort, 30, '500', FF, CW, 2) : [];
 
   var o=[];
   o.push('<rect width="'+W+'" height="'+H+'" fill="'+BG+'"/>');
