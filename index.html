@@ -4533,11 +4533,44 @@ function ikGoogleBtnReset() {
   if (btn) btn.textContent = 'Masuk dengan Google';
 }
 
+/* Cek dulu apakah provider Google sudah diaktifkan di project Firebase ini.
+   Kalau belum, jangan alihkan ke halaman Google — halaman itu hanya
+   menampilkan 'The requested action is invalid.' yang membingungkan.
+   Dipakai createAuthUri (REST ringan, sama yang dipakai SDK di baliknya). */
+function ikCheckGoogleProvider(cb) {
+  var key = (typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey) || '';
+  if (!key || !window.fetch) { cb(true); return; }
+  var done = false;
+  var timer = setTimeout(function () { if (!done) { done = true; cb(true); } }, 6000);
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=' + encodeURIComponent(key), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ providerId: 'google.com', continueUri: location.origin + '/' })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (done) return; done = true; clearTimeout(timer);
+    var msg = d && d.error && d.error.message;
+    if (msg && msg.indexOf('OPERATION_NOT_ALLOWED') === 0) { cb(false); return; }
+    cb(true);
+  }).catch(function () { if (done) return; done = true; clearTimeout(timer); cb(true); });
+}
+
 function doGoogleLogin() {
   const _auth = getAuth();
   if (!_auth) { showToast('SDK Firebase gagal dimuat. Periksa koneksi internet.', 'e'); return; }
   const btn = document.getElementById('google-btn-text');
   if (btn) btn.innerHTML = '<div class="spin" style="width:20px;height:20px;border-width:2px"></div>';
+  ikCheckGoogleProvider(function (ok) {
+    if (!ok) {
+      ikGoogleBtnReset();
+      showToast('Google Sign-In belum diaktifkan di Firebase Console. Buka Authentication > Sign-in method > Google, lalu aktifkan.', 'e');
+      return;
+    }
+    ikDoGoogleAuth(_auth);
+  });
+}
+
+function ikDoGoogleAuth(_auth) {
+  const btn = document.getElementById('google-btn-text');
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
