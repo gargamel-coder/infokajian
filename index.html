@@ -4966,179 +4966,22 @@ function toggleReminder() {
   setTimeout(run, 2500);
 })();
 </script>
-<!-- ══════════ DEBUG PANEL (?debug=1) — SEMENTARA, HAPUS SETELAH SELESAI ══════════ -->
-<div id="ik-debug" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2147483647;background:rgba(0,0,0,.88);color:#4ade80;font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));white-space:pre;max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch"></div>
 <script>
+/* Bersihkan sisa elemen debug dari build sebelumnya (panel, garis probe,
+   tombol tutup). Elemen-elemen ini hanya dibuat oleh panel ?debug=1 yang
+   sudah dihapus dari sumber, tapi bisa masih ada di cache PWA lama. */
 (function(){
-  // Tampil kalau ?debug=1 ATAU sedang berjalan sebagai PWA standalone.
-  // (Di standalone tidak mungkin menambahkan query param ke peluncuran ikon.)
-  var isStandalone = false;
-  try { isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch(e) {}
-  if (!/[?&]debug=1(&|$)/.test(location.search) && !isStandalone) return;
-  var box = document.getElementById('ik-debug');
-  box.style.display = 'block';
-  // Tombol tutup supaya bisa mengintip UI di baliknya
-  var closeBtn = document.createElement('button');
-  closeBtn.textContent = 'TUTUP PANEL';
-  closeBtn.style.cssText = 'position:fixed;top:6px;right:8px;z-index:2147483647;background:#4ade80;color:#000;border:none;border-radius:6px;padding:5px 10px;font:bold 11px ui-monospace,monospace';
-  closeBtn.onclick = function(){ box.style.display='none'; closeBtn.style.display='none'; };
-  document.body.appendChild(closeBtn);
-
-  function envInset(side){
-    var d = document.createElement('div');
-    d.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;padding-' + side + ':env(safe-area-inset-' + side + ',0px)';
-    document.body.appendChild(d);
-    var v = getComputedStyle(d).getPropertyValue('padding-' + side);
-    d.parentNode.removeChild(d);
-    return (v || '').trim() || '0px';
-  }
-  function rect(e){
-    if (!e) return '-';
-    var r = e.getBoundingClientRect();
-    return Math.round(r.top) + '..' + Math.round(r.bottom) + ' h' + Math.round(r.height);
-  }
-  function css(e, prop){ return e ? getComputedStyle(e).getPropertyValue(prop) : '-'; }
-
-  function render(){
-    var nav  = document.getElementById('gnav');
-    var app  = document.getElementById('app');
-    var hero = document.getElementById('home-hero');
-    var inner = nav ? nav.querySelector('nav') : null;
-    var item = nav ? nav.querySelector('.nav-item') : null;
-
-    // anak paling bawah di dalam nav (untuk tahu sisa putih di bawah label)
-    var lowest = '-', lowestBottom = 0;
-    if (nav) {
-      var kids = [].slice.call(nav.querySelectorAll('*'));
-      kids.forEach(function(k){
-        var r = k.getBoundingClientRect();
-        if (r.height > 0 && r.bottom > lowestBottom) { lowestBottom = r.bottom; lowest = k.tagName + '.' + String(k.className || '').slice(0,18); }
-      });
+  try {
+    ['ik-debug','ik-probe-magenta','ik-probe-green'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    var btns = document.querySelectorAll('body > button');
+    for (var i = 0; i < btns.length; i++) {
+      if (/TUTUP PANEL/.test(btns[i].textContent || '')) btns[i].parentNode.removeChild(btns[i]);
     }
-    var navR = nav ? nav.getBoundingClientRect() : null;
-
-    var L = [];
-    L.push('=== INFO KAJIAN DEBUG (build 3e99e7f+) ===');
-    L.push('waktu            ' + new Date().toLocaleTimeString('id-ID'));
-    L.push('innerHeight      ' + window.innerHeight);
-    L.push('visualViewport   ' + (window.visualViewport ? Math.round(window.visualViewport.height) : '-') + '  offTop ' + (window.visualViewport ? Math.round(window.visualViewport.offsetTop) : '-'));
-    L.push('screen           ' + screen.width + 'x' + screen.height);
-    L.push('dpr              ' + window.devicePixelRatio);
-    L.push('display-mode     ' + (matchMedia('(display-mode: standalone)').matches ? 'STANDALONE' : 'browser'));
-    L.push('');
-    L.push('-- env() asli (diukur) --');
-    L.push('safe-area-top    ' + envInset('top'));
-    L.push('safe-area-bottom ' + envInset('bottom'));
-    L.push('');
-    L.push('-- NAV --');
-    L.push('nav.offsetHeight ' + (nav ? nav.offsetHeight : '-'));
-    L.push('nav.rect         ' + rect(nav));
-    L.push('nav height(css)  ' + css(nav, 'height'));
-    L.push('nav pad-top      ' + css(nav, 'padding-top'));
-    L.push('nav pad-bottom   ' + css(nav, 'padding-bottom'));
-    L.push('nav margin-bot   ' + css(nav, 'margin-bottom'));
-    L.push('inner<nav>.rect  ' + rect(inner));
-    L.push('.nav-item rect   ' + rect(item) + ' padB ' + css(item, 'padding-bottom'));
-    L.push('anak terbawah    ' + lowest + '  bottom ' + Math.round(lowestBottom));
-    L.push('SISA PUTIH DI BAWAH LABEL: ' + (navR ? Math.round(navR.bottom - lowestBottom) : '-') + 'px');
-    L.push('GAP nav ke dasar viewport: ' + (navR ? Math.round(window.innerHeight - navR.bottom) : '-') + 'px');
-    L.push('');
-    L.push('-- ATAS --');
-    L.push('app.rect         ' + rect(app));
-    L.push('#app pad-top     ' + css(app, 'padding-top'));
-    L.push('hero.rect        ' + rect(hero));
-    L.push('hero pad-top     ' + css(hero, 'padding-top'));
-    L.push('screen-content pT ' + css(document.querySelector('#scr-home .screen-content'), 'padding-top'));
-    L.push('');
-    L.push('-- VIEWPORT UNITS --');
-    function vhU(u){
-      var d=document.createElement('div');
-      d.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:'+u;
-      document.body.appendChild(d);
-      var h=Math.round(d.getBoundingClientRect().height);
-      d.parentNode.removeChild(d);
-      return h;
-    }
-    L.push('100vh            ' + vhU('100vh'));
-    L.push('100dvh           ' + vhU('100dvh'));
-    L.push('100svh           ' + vhU('100svh'));
-    L.push('100lvh           ' + vhU('100lvh'));
-    L.push('docEl.clientH    ' + document.documentElement.clientHeight);
-    L.push('body.clientH     ' + document.body.clientHeight);
-    var vv2 = window.visualViewport;
-    L.push('vv.offsetTop     ' + (vv2 ? vv2.offsetTop : '-'));
-    L.push('vv.pageTop       ' + (vv2 ? vv2.pageTop : '-'));
-    L.push('screen.height    ' + screen.height);
-    L.push('screen.availH    ' + screen.availHeight);
-    L.push('SELISIH layar-vp ' + (screen.height - window.innerHeight) + 'px');
-    L.push('');
-    L.push('-- STATUS BAR / ATAS --');
-    var safeTopPx = parseFloat(envInset('top')) || 0;
-    var clock = document.getElementById('ik-clock');
-    if (clock) {
-      var cr = clock.getBoundingClientRect();
-      L.push('jam(#ik-clock).top ' + Math.round(cr.top) + (cr.top < safeTopPx ? '  <== TERTIMPA!' : '  (aman)'));
-    }
-    var notifBtn = document.getElementById('home-notif-btn');
-    if (notifBtn) { var nr2 = notifBtn.getBoundingClientRect(); L.push('tombol notif.top  ' + Math.round(nr2.top)); }
-    L.push('');
-    L.push('-- PENGAMAN NAV --');
-    L.push('nav position     ' + (nav ? getComputedStyle(nav).position : '-') + (nav && getComputedStyle(nav).position === 'fixed' ? '  (FALLBACK AKTIF)' : '  (flex child)'));
-    L.push('--nav-h          ' + getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim());
-    L.push('html height      ' + getComputedStyle(document.documentElement).height);
-    L.push('#app height      ' + (app ? getComputedStyle(app).height : '-'));
-    L.push('');
-    L.push('-- UJI PENENTU (garis) --');
-    var gEl = document.getElementById('ik-probe-green');
-    var mEl = document.getElementById('ik-probe-magenta');
-    L.push('GARIS HIJAU (dasar #app)   bottom ' + (gEl ? Math.round(gEl.getBoundingClientRect().bottom) : '-'));
-    L.push('GARIS MAGENTA (fixed b:0)  bottom ' + (mEl ? Math.round(mEl.getBoundingClientRect().bottom) : '-'));
-    var gB = gEl ? Math.round(gEl.getBoundingClientRect().bottom) : 0;
-    var mB = mEl ? Math.round(mEl.getBoundingClientRect().bottom) : 0;
-    L.push('SELISIH hijau-magenta      ' + (gB - mB) + 'px  ' + (gB > mB ? '(hijau DI BAWAH = bagus)' : gB < mB ? '(hijau DI ATAS = terpotong!)' : '(sama)'));
-    L.push('');
-    L.push('-- APP vs LAYAR --');
-    L.push('100lvh           ' + vhU('100lvh'));
-    L.push('app.rect.bottom  ' + (app ? Math.round(app.getBoundingClientRect().bottom) : '-'));
-    L.push('nav.rect.bottom  ' + (nav ? Math.round(nav.getBoundingClientRect().bottom) : '-'));
-    L.push('');
-    L.push('-- DUMMY env (elemen) --');
-    var dT = document.createElement('div'); dT.style.cssText='position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px)'; document.body.appendChild(dT);
-    var dB = document.createElement('div'); dB.style.cssText='position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(dB);
-    L.push('dummy padding-top    ' + getComputedStyle(dT).paddingTop);
-    L.push('dummy padding-bottom ' + getComputedStyle(dB).paddingBottom);
-    dT.parentNode.removeChild(dT); dB.parentNode.removeChild(dB);
-
-    box.textContent = L.join('\n');
-  }
-
-  // Strip visual untuk verifikasi mata:
-  // MERAH harus tepat menutupi jam status bar iOS.
-  // BIRU  harus tepat menutupi area home indicator (di bawah label nav).
-  var st = document.createElement('div');
-  st.style.cssText = 'position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:rgba(255,0,0,.30);z-index:2147483645;pointer-events:none';
-  document.body.appendChild(st);
-
-  // GARIS PENENTU:
-  // MAGENTA = dasar "position:fixed; bottom:0" (acuan layout viewport)
-  // HIJAU   = dasar #app (harus setara dasar layar fisik kalau 100lvh bekerja)
-  var mag = document.createElement('div');
-  mag.id = 'ik-probe-magenta';
-  mag.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:6px;background:#FF00FF;z-index:2147483646;pointer-events:none';
-  document.body.appendChild(mag);
-  var grn = document.createElement('div');
-  grn.id = 'ik-probe-green';
-  grn.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:6px;background:#00FF00;z-index:2147483646;pointer-events:none';
-  var appEl = document.getElementById('app');
-  if (appEl) appEl.appendChild(grn);
-
-  render();
-  window.addEventListener('resize', render);
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', render);
-  setTimeout(render, 1200);
-  setTimeout(render, 3000);
+  } catch (e) {}
 })();
 </script>
-
 </body>
 </html>
