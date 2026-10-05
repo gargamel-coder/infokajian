@@ -1224,14 +1224,13 @@ function showBanner() {
     </div>
     <div class="screen-content" style="padding:16px 16px 32px">
       <div class="field"><label class="lbl">Judul Kajian *</label><input id="sub-title" class="inp" placeholder="Judul kajian"/></div>
-      <div class="field"><label class="lbl">Topik *</label>
+      <div class="field"><label class="lbl">Kategori *</label>
         <select id="sub-topic" class="inp">
-          <option value="">Pilih topik</option>
-          <option>Tafsir</option><option>Fiqih</option><option>Akidah</option><option>Hadits</option>
-          <option>Sirah</option><option>Akhlak</option><option>Muslimah</option><option>Keluarga</option>
-          <option>Tilawah</option><option>Lainnya</option>
+          <option value="">Pilih kategori</option>
+          <option>Pekanan</option><option>Kitab</option><option>Tematik</option><option>Dauroh</option>
         </select>
       </div>
+      <div class="field"><label class="lbl">Sumber</label><input id="sub-source" class="inp" placeholder="Nama akun Instagram, mis. @masjidnuruliman"/></div>
       <!-- Speaker autocomplete -->
       <div class="field ac-wrap">
         <label class="lbl">Pembicara *</label>
@@ -3215,10 +3214,15 @@ function ikPosterSVGString(k){
     }
   }
 
-  // ── Baris bawah tengah: sumber IG (kalau masjid punya) ──
-  var ig = msq && (msq.instagram || msq.ig);
-  if (ig){
-    var handle = String(ig).replace(/^@/,'');
+  // ── Baris bawah tengah: Sumber (nama akun Instagram kajian) ──
+  // Diisi dari field 'Sumber' saat submit; kalau kosong, pakai akun IG
+  // masjid sebagai cadangan. Menggantikan nama kontributor.
+  var srcRaw = k.source || (msq && (msq.instagram || msq.ig)) || '';
+  // Rapikan jadi bentuk handle: buang '@', spasi, dan karakter yang tidak
+  // valid di username Instagram (mis. "Telegram Bot" -> "TelegramBot").
+  // Kalau tidak ada huruf/angka sama sekali (mis. "-"), baris dilewati.
+  var handle = String(srcRaw).trim().replace(/^@+/,'').replace(/[^A-Za-z0-9._]+/g,'');
+  if (/[A-Za-z0-9]/.test(handle)){
     var lb = 'Sumber:';
     var lw = ikMeasure(lb,24,'600',FF), hw = ikMeasure('@'+handle,24,'700',FF);
     var sx = (W - (lw + 42 + hw))/2, sy = 1283;
@@ -3227,10 +3231,6 @@ function ikPosterSVGString(k){
     o.push('<text x="'+(sx+lw+42)+'" y="'+sy+'" font-family="'+FF+'" font-size="24" font-weight="700" fill="'+LBL+'">'+ikPosterEsc('@'+handle)+'</text>');
   }
 
-  // ── Kontributor kecil pojok kanan bawah ──
-  if (sub && sub.name){
-    o.push('<text x="'+(W-PAD)+'" y="1290" text-anchor="end" font-family="'+FF+'" font-size="19" font-weight="600" fill="'+FOOT+'">'+ikPosterEsc('oleh '+sub.name)+'</text>');
-  }
 
   return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+o.join('')+'</svg>';
 }
@@ -3326,7 +3326,7 @@ function shareKajian() {
     '🕌 *INFO KAJIAN*',
     '',
     '📚 *' + k.title + '*',
-    '🗂️ Topik: ' + k.topic,
+    '🗂️ Kategori: ' + k.topic,
     spk ? '🎙️ Pembicara: ' + spk.full_name + (spk.verified ? ' ✓' : '') : null,
     '📅 Tanggal: ' + fmtDateLong(k.date),
     '🕐 Waktu: ' + k.time + ' WIB',
@@ -3684,6 +3684,7 @@ function initSubmit() {
       if(document.getElementById('sub-date')) document.getElementById('sub-date').value=k.date;
       if(document.getElementById('sub-time')) document.getElementById('sub-time').value=k.time;
       if(document.getElementById('sub-desc')) document.getElementById('sub-desc').value=k.description||'';
+      if(document.getElementById('sub-source')) document.getElementById('sub-source').value=k.source||'';
       if(spk){state.selectedSpeakerId=spk.id;document.getElementById('sub-spk-q').value=spk.full_name;document.getElementById('sub-spk-check').style.display='flex';}
       if(msq){state.selectedMosqueId=msq.id;document.getElementById('sub-mq-q').value=msq.name;document.getElementById('sub-mq-check').style.display='flex';}
     }
@@ -3691,6 +3692,7 @@ function initSubmit() {
     state.selectedSpeakerId=null; state.selectedMosqueId=null;
     ['sub-title','sub-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     if(document.getElementById('sub-topic')) document.getElementById('sub-topic').value='';
+    if(document.getElementById('sub-source')) document.getElementById('sub-source').value='';
     if(document.getElementById('sub-spk-q')) document.getElementById('sub-spk-q').value='';
     if(document.getElementById('sub-mq-q')) document.getElementById('sub-mq-q').value='';
     if(document.getElementById('sub-spk-check')) document.getElementById('sub-spk-check').style.display='none';
@@ -3786,6 +3788,8 @@ function doSubmit() {
   const date=document.getElementById('sub-date').value;
   const time=document.getElementById('sub-time').value;
   const desc=document.getElementById('sub-desc').value.trim();
+  const srcEl=document.getElementById('sub-source');
+  const source=srcEl?srcEl.value.trim():'';
   if(!title||!topic||!date||!time||!state.selectedSpeakerId||!state.selectedMosqueId){showToast('Isi semua field yang diperlukan','e');return;}
   // Fix 3: Prevent past date submission
   if(date < T){showToast('Tidak bisa submit kajian dengan tanggal yang sudah berlalu','e');return;}
@@ -3796,12 +3800,12 @@ function doSubmit() {
     const eid = state.editKajianId;
     if(eid) {
       const k=DB.kajian.find(x=>x.id===eid);
-      if(k){k.title=title;k.topic=topic;k.speaker_id=state.selectedSpeakerId;k.mosque_id=state.selectedMosqueId;k.date=date;k.time=time;k.description=desc;
+      if(k){k.title=title;k.topic=topic;k.speaker_id=state.selectedSpeakerId;k.mosque_id=state.selectedMosqueId;k.date=date;k.time=time;k.description=desc;k.source=source;
       fsSet('kajian',k.id,k);}
       state.editKajianId=null;
       showToast('Kajian berhasil diperbarui! ✓','s');
     } else {
-      const k={id:'k'+Date.now(),title:title,topic:topic,speaker_id:state.selectedSpeakerId,mosque_id:state.selectedMosqueId,date:date,time:time,status:(state.user&&state.user.role==='admin')?'approved':'pending',description:desc,submitted_by:(state.user&&state.user.id)||'u1'};
+      const k={id:'k'+Date.now(),title:title,topic:topic,speaker_id:state.selectedSpeakerId,mosque_id:state.selectedMosqueId,date:date,time:time,status:(state.user&&state.user.role==='admin')?'approved':'pending',description:desc,source:source,submitted_by:(state.user&&state.user.id)||'u1'};
       DB.kajian.push(k);
       fsSet('kajian',k.id,k);      if(state.user&&state.user.role==='admin'){state.notifications.unshift({message:'Kajian "'+title+'" berhasil dipublikasikan!',read:false,timestamp:new Date().toISOString()});notifySubscribers(k);showToast('Kajian berhasil dipublikasikan!','s');}
       else { showToast('Kajian dikirim untuk review admin.','s'); notifyAdmin('Kajian baru "'+title+'" disubmit oleh '+((state.user&&state.user.name)||'kontributor')+'. Menunggu review.'); }
