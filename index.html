@@ -4556,8 +4556,8 @@ function ikOnOriginBlocked() {
   if (!holder) return;
   holder.innerHTML = '<p style="font-size:12.5px;color:var(--danger);text-align:center;line-height:1.55">'
     + 'Login Google belum bisa dipakai di domain <b>' + location.host + '</b>.<br>'
-    + 'Domain ini belum terdaftar sebagai <b>Authorized JavaScript origin</b> pada OAuth Client ID '
-    + 'di Google Cloud Console. Setelah ditambahkan, muat ulang halaman ini.</p>';
+    + 'Domain ini perlu ditambahkan sebagai <b>Authorized JavaScript origin</b> pada OAuth Client ID '
+    + 'di Google Cloud Console (project <b>infokajian-6e053</b>). Setelah ditambahkan, tunggu 5-10 menit lalu muat ulang.</p>';
 }
 
 /* Muat skrip GIS sekali saja. */
@@ -4662,9 +4662,10 @@ function ikRenderGisButton() {
    tidak bisa ditangkap dari halaman ini — jadi disediakan tombol bantuan. */
 function ikShowLoginHelp() {
   var host = location.host || 'domain ini';
-  var pesan = 'Login Google belum aktif untuk ' + host + '. '
-    + 'Pemilik aplikasi perlu menambahkan domain ini sebagai '
-    + 'Authorized JavaScript origin pada OAuth Client ID di Google Cloud Console.';
+  var pesan = 'Kalau muncul "Access blocked" atau "origin_mismatch": '
+    + 'pemilik aplikasi perlu menambahkan ' + host + ' sebagai '
+    + 'Authorized JavaScript origin pada OAuth Client ID di Google Cloud Console '
+    + '(project infokajian-6e053), lalu tunggu 5-10 menit.';
   showToast(pesan, 'i');
 }
 
