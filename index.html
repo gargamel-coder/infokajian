@@ -89,7 +89,11 @@ if (location.protocol === 'file:') {
 }
 /* height:100% (BUKAN 100vh/100dvh). Background disamakan dengan warna nav
    (putih) supaya area safe-area di bawah nav tidak terlihat beda warna. */
-html,body{height:100%;overflow:hidden;background:#fff}
+/* STEP 3: pakai 100lvh (large viewport = tinggi layar fisik).
+   Di iOS standalone, innerHeight/100dvh bisa lebih pendek dari layar
+   (di sini 848 vs 896). 100lvh = 896 sehingga halaman menutupi layar penuh.
+   Fallback 100% untuk browser lama. Background = warna nav (step 4). */
+html,body{height:100%;height:100lvh;overflow:hidden;background:#fff}
 body{position:relative}
 body{font-family:var(--font);color:var(--text);background:#fff;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 button{font-family:var(--font);cursor:pointer;border:none;outline:none;background:none;color:inherit;-webkit-tap-highlight-color:transparent}
@@ -99,21 +103,26 @@ img{display:block}
 /* APP SHELL
    Bottom nav sekarang position:fixed (menempel viewport), jadi #app tidak
    perlu trik tinggi apa pun. Cukup height:100% mengikuti html/body. */
-#app{max-width:430px;margin:0 auto;height:100%;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+/* STEP 3: #app setinggi 100lvh juga, supaya nav (flex child terakhir)
+   duduk di dasar LAYAR FISIK (896), bukan di dasar layout viewport (848). */
+#app{max-width:430px;margin:0 auto;height:100%;height:100lvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 
 /* SCREENS */
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;position:relative}
 .screen.active{display:flex;flex-direction:column}
 /* Konten diberi ruang bawah setinggi nav (~57px) + safe-area supaya
    bagian paling bawah tidak tertutup bottom nav yang position:fixed. */
-.screen-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))!important;overscroll-behavior-y:contain}
+.screen-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav-h, 0px) + 12px)!important;overscroll-behavior-y:contain}
 
 /* BOTTOM NAV */
 #bnav,#bnav2,#bnav3,#bnav4{display:none!important}
-/* Bottom nav: fixed di dasar viewport.
-   padding-bottom: env(safe-area-inset-bottom) HANYA DI SINI (satu kali).
-   Tidak ada padding/margin lain yang meniru safe-area. */
-#gnav{position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;width:100%;background:#fff;border-top:1px solid var(--border);display:flex;z-index:90;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 16px rgba(35,53,44,.08)}
+/* STEP 3: nav TIDAK lagi position:fixed (fixed menempel layout viewport
+   yang di iOS standalone lebih pendek 48px dari layar).
+   Sekarang nav = flex child terakhir dari #app yang tingginya 100lvh,
+   sehingga otomatis duduk di dasar layar fisik (896).
+   --nav-h didokumentasikan untuk referensi: 58px isi + safe-area + 1px border.
+   padding-bottom: env(safe-area-inset-bottom) tetap HANYA DI SINI (satu kali). */
+#gnav{--nav-h:calc(58px + env(safe-area-inset-bottom,0px) + 1px);flex-shrink:0;width:100%;background:#fff;border-top:1px solid var(--border);display:flex;z-index:90;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 16px rgba(35,53,44,.08)}
 #gnav.hidden{display:none}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 4px 7px;gap:3px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .2s;position:relative}
 .nav-item.active{color:var(--acc)}
@@ -4890,6 +4899,62 @@ function toggleReminder() {
   </div>
 </div>
 
+<script>
+/* ══════════ PENGAMAN NAV (step 3) ══════════
+   #app memakai 100lvh (tinggi layar fisik) supaya nav duduk di dasar LAYAR,
+   bukan di dasar layout viewport yang di iOS standalone lebih pendek 48px.
+
+   RISIKO: kalau 100lvh lebih tinggi dari area yang benar-benar terlihat,
+   nav akan terpotong di luar layar. Jadi setelah render kita UKUR:
+   kalau nav.bottom melebihi area terlihat, kembalikan nav ke position:fixed
+   (yang selalu terlihat), dan beri konten padding setinggi nav.
+   Dengan begini aman di kedua skenario. */
+(function(){
+  function ikNavSafety(){
+    var nav = document.getElementById('gnav');
+    var app = document.getElementById('app');
+    if (!nav || !app) return;
+    var vv = window.visualViewport;
+    var visH = (vv && vv.height) ? vv.height : (window.innerHeight || 0);
+    var r = nav.getBoundingClientRect();
+    var terpotong = r.height > 0 && (r.bottom > visH + 1 || r.top < -1);
+
+    if (terpotong) {
+      // Nav tidak muat -> pakai position:fixed (selalu terlihat)
+      nav.style.position = 'fixed';
+      nav.style.bottom = '0';
+      nav.style.left = '0';
+      nav.style.right = '0';
+      nav.style.maxWidth = '430px';
+      nav.style.margin = '0 auto';
+      nav.style.width = '100%';
+      document.documentElement.style.setProperty('--nav-h', (nav.offsetHeight || 0) + 'px');
+    } else {
+      // Nav muat di dalam #app (100lvh) -> biarkan sebagai flex child
+      nav.style.position = '';
+      nav.style.bottom = '';
+      nav.style.left = '';
+      nav.style.right = '';
+      nav.style.maxWidth = '';
+      nav.style.margin = '';
+      nav.style.width = '';
+      document.documentElement.style.setProperty('--nav-h', '0px');
+    }
+    return terpotong;
+  }
+  window.ikNavSafety = ikNavSafety;
+
+  function run(){ try { ikNavSafety(); } catch(e){} }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(run, 60); });
+  else setTimeout(run, 60);
+  window.addEventListener('resize', run);
+  window.addEventListener('orientationchange', function(){ setTimeout(run, 150); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', run);
+  setTimeout(run, 400);
+  setTimeout(run, 1200);
+  setTimeout(run, 2500);
+})();
+</script>
 <!-- ══════════ DEBUG PANEL (?debug=1) — SEMENTARA, HAPUS SETELAH SELESAI ══════════ -->
 <div id="ik-debug" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2147483647;background:rgba(0,0,0,.88);color:#4ade80;font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));white-space:pre;max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch"></div>
 <script>
@@ -5006,6 +5071,26 @@ function toggleReminder() {
     var notifBtn = document.getElementById('home-notif-btn');
     if (notifBtn) { var nr2 = notifBtn.getBoundingClientRect(); L.push('tombol notif.top  ' + Math.round(nr2.top)); }
     L.push('');
+    L.push('-- PENGAMAN NAV --');
+    L.push('nav position     ' + (nav ? getComputedStyle(nav).position : '-') + (nav && getComputedStyle(nav).position === 'fixed' ? '  (FALLBACK AKTIF)' : '  (flex child)'));
+    L.push('--nav-h          ' + getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim());
+    L.push('html height      ' + getComputedStyle(document.documentElement).height);
+    L.push('#app height      ' + (app ? getComputedStyle(app).height : '-'));
+    L.push('');
+    L.push('-- UJI PENENTU (garis) --');
+    var gEl = document.getElementById('ik-probe-green');
+    var mEl = document.getElementById('ik-probe-magenta');
+    L.push('GARIS HIJAU (dasar #app)   bottom ' + (gEl ? Math.round(gEl.getBoundingClientRect().bottom) : '-'));
+    L.push('GARIS MAGENTA (fixed b:0)  bottom ' + (mEl ? Math.round(mEl.getBoundingClientRect().bottom) : '-'));
+    var gB = gEl ? Math.round(gEl.getBoundingClientRect().bottom) : 0;
+    var mB = mEl ? Math.round(mEl.getBoundingClientRect().bottom) : 0;
+    L.push('SELISIH hijau-magenta      ' + (gB - mB) + 'px  ' + (gB > mB ? '(hijau DI BAWAH = bagus)' : gB < mB ? '(hijau DI ATAS = terpotong!)' : '(sama)'));
+    L.push('');
+    L.push('-- APP vs LAYAR --');
+    L.push('100lvh           ' + vhU('100lvh'));
+    L.push('app.rect.bottom  ' + (app ? Math.round(app.getBoundingClientRect().bottom) : '-'));
+    L.push('nav.rect.bottom  ' + (nav ? Math.round(nav.getBoundingClientRect().bottom) : '-'));
+    L.push('');
     L.push('-- DUMMY env (elemen) --');
     var dT = document.createElement('div'); dT.style.cssText='position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px)'; document.body.appendChild(dT);
     var dB = document.createElement('div'); dB.style.cssText='position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(dB);
@@ -5022,9 +5107,19 @@ function toggleReminder() {
   var st = document.createElement('div');
   st.style.cssText = 'position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:rgba(255,0,0,.30);z-index:2147483645;pointer-events:none';
   document.body.appendChild(st);
-  var sb = document.createElement('div');
-  sb.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:env(safe-area-inset-bottom,0px);background:rgba(0,80,255,.30);z-index:2147483645;pointer-events:none';
-  document.body.appendChild(sb);
+
+  // GARIS PENENTU:
+  // MAGENTA = dasar "position:fixed; bottom:0" (acuan layout viewport)
+  // HIJAU   = dasar #app (harus setara dasar layar fisik kalau 100lvh bekerja)
+  var mag = document.createElement('div');
+  mag.id = 'ik-probe-magenta';
+  mag.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:6px;background:#FF00FF;z-index:2147483646;pointer-events:none';
+  document.body.appendChild(mag);
+  var grn = document.createElement('div');
+  grn.id = 'ik-probe-green';
+  grn.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:6px;background:#00FF00;z-index:2147483646;pointer-events:none';
+  var appEl = document.getElementById('app');
+  if (appEl) appEl.appendChild(grn);
 
   render();
   window.addEventListener('resize', render);
