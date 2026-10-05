@@ -479,8 +479,11 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
   }
  
   /* Spacer agar konten di bawah tidak tertutup banner */
+  /* Spacer dibuat 0: banner install position:fixed (overlay), dan #app kini
+     setinggi 100lvh. Kalau spacer punya tinggi, ia mendorong #app ke bawah
+     sehingga nav bisa keluar layar. */
   .pwa-install-banner-spacer {
-    height: 68px;
+    height: 0 !important;
     transition: height 0.3s;
   }
  
@@ -4915,9 +4918,17 @@ function toggleReminder() {
     var app = document.getElementById('app');
     if (!nav || !app) return;
     var vv = window.visualViewport;
-    var visH = (vv && vv.height) ? vv.height : (window.innerHeight || 0);
+    // Dasar viewport yang dilaporkan (ambil yang paling besar dari semua sumber)
+    var visBottom = Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      (vv && vv.height) || 0
+    );
     var r = nav.getBoundingClientRect();
-    var terpotong = r.height > 0 && (r.bottom > visH + 1 || r.top < -1);
+    // Trip HANYA kalau nav benar-benar TIDAK terlihat (mulai di/di bawah dasar
+    // viewport). Kalau nav masih sebagian terlihat, biarkan: itu justru kondisi
+    // yang mau kita perbaiki (nav duduk di dasar layar fisik).
+    var terpotong = r.height > 0 && r.top >= visBottom - 4;
 
     if (terpotong) {
       // Nav tidak muat -> pakai position:fixed (selalu terlihat)
