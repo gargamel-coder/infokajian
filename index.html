@@ -87,45 +87,33 @@ if (location.protocol === 'file:') {
   --shadow:0 4px 20px rgba(35,53,44,.06);
   --shadow2:0 10px 32px rgba(35,53,44,.10);
 }
-html,body{height:100%;overflow:hidden}
-/* CATATAN PENTING (jangan pakai vh/dvh di sini):
-   100vh & 100dvh TIDAK bisa dipercaya di iOS. Di Safari standalone (Add to
-   Home Screen) keduanya bisa mengembalikan tinggi yang lebih pendek dari
-   layar, sehingga #app berakhir di atas dan nav terlihat "menggantung".
-   window.innerHeight juga tidak konsisten di standalone.
-   Solusi: rantai height:100% (html -> body) + #app diposisikan absolut
-   dengan top/bottom:0. Tinggi ditentukan oleh layout engine browser, bukan
-   oleh angka dari JS. */
+/* height:100% (BUKAN 100vh/100dvh). Background disamakan dengan warna nav
+   (putih) supaya area safe-area di bawah nav tidak terlihat beda warna. */
+html,body{height:100%;overflow:hidden;background:#fff}
 body{position:relative}
-body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+body{font-family:var(--font);color:var(--text);background:#fff;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 button{font-family:var(--font);cursor:pointer;border:none;outline:none;background:none;color:inherit;-webkit-tap-highlight-color:transparent}
 input,textarea,select{font-family:var(--font);outline:none;border:none;background:none}
 img{display:block}
 
-/* APP SHELL */
-/* #app = app shell layar penuh.
-   PENTING: pakai position:fixed + top:0 + bottom:0 sehingga TINGGINYA
-   ditentukan langsung oleh viewport (initial containing block), bukan oleh
-   tinggi html/body. Di iOS standalone tinggi html/body kadang dilaporkan
-   lebih besar dari layar, dan kalau #app memakai height:100%/absolute maka
-   #app ikut memanjang -> bottom nav meleset keluar layar.
-   position:fixed + top/bottom:0 kebal terhadap masalah itu. */
-#app{position:fixed;top:0;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+/* APP SHELL
+   Bottom nav sekarang position:fixed (menempel viewport), jadi #app tidak
+   perlu trik tinggi apa pun. Cukup height:100% mengikuti html/body. */
+#app{max-width:430px;margin:0 auto;height:100%;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 
 /* SCREENS */
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;position:relative}
 .screen.active{display:flex;flex-direction:column}
-.screen-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));overscroll-behavior-y:contain}
+/* Konten diberi ruang bawah setinggi nav (~57px) + safe-area supaya
+   bagian paling bawah tidak tertutup bottom nav yang position:fixed. */
+.screen-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))!important;overscroll-behavior-y:contain}
 
 /* BOTTOM NAV */
 #bnav,#bnav2,#bnav3,#bnav4{display:none!important}
-#gnav{flex-shrink:0;width:100%;background:#fff;border-top:1px solid var(--border);display:flex;z-index:90;padding-bottom:max(env(safe-area-inset-bottom,0px),8px);box-shadow:0 -2px 16px rgba(35,53,44,.08);-webkit-backface-visibility:hidden}
-/* Mode standalone (Add to Home Screen): iOS kadang melaporkan
-   env(safe-area-inset-bottom)=0, sehingga nav menempel ke home indicator.
-   Beri jarak minimum yang lebih besar khusus di mode ini. */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  #gnav{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}
-}
+/* Bottom nav: fixed di dasar viewport.
+   padding-bottom: env(safe-area-inset-bottom) HANYA DI SINI (satu kali).
+   Tidak ada padding/margin lain yang meniru safe-area. */
+#gnav{position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;width:100%;background:#fff;border-top:1px solid var(--border);display:flex;z-index:90;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 16px rgba(35,53,44,.08)}
 #gnav.hidden{display:none}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 4px 7px;gap:3px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .2s;position:relative}
 .nav-item.active{color:var(--acc)}
@@ -729,14 +717,12 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
 // layout engine browser (selalu = tinggi viewport yang benar, termasuk di iOS
 // standalone). Kita hanya perlu menggeser `top` sebesar tinggi banner install.
 // Tidak ada perhitungan tinggi manual -> tidak ada lagi nav "menggantung".
+// Bottom nav sekarang position:fixed, jadi TIDAK ada perhitungan tinggi #app
+// di sini. Banner install ditangani oleh spacer statis sebelum #app.
+// Fungsi ini disisakan (dipanggil dari beberapa tempat) tapi sengaja kosong
+// supaya tidak ada lagi trik tinggi yang bisa salah di iOS.
 function ikSyncBannerOffset(){
-  var app = document.getElementById('app');
-  if (!app) return;
-  var b = document.getElementById('pwa-install-banner');
-  var h = (b && b.getBoundingClientRect().height > 1) ? Math.round(b.getBoundingClientRect().height) : 0;
-  // `bottom` sengaja TIDAK disentuh (selalu 0 dari CSS) supaya nav selalu
-  // menempel di dasar viewport. Cukup geser `top` kalau banner aktif.
-  app.style.top = h > 0 ? (h + 'px') : '';
+  // sengaja tidak melakukan apa pun
 }
 window.addEventListener('resize', function(){ try{ ikSyncBannerOffset(); }catch(e){} });
 window.ikSyncBannerOffset = ikSyncBannerOffset;
@@ -1429,7 +1415,7 @@ function showBanner() {
   </div>
 
   <div id="gnav">
-    <nav style="display:flex;width:100%;background:#fff;border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom,0px)">
+    <nav style="display:flex;width:100%">
       <div class="nav-item active" data-nav="home" onclick="goScreen('home')"><div style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><span>Beranda</span></div>
       <div class="nav-item" data-nav="kajian" onclick="goScreen('kajian')"><div style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div><span>Kajian</span></div>
       <div class="nav-item" data-nav="prayer" onclick="goScreen('prayer')"><div style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><span>Sholat</span></div>
@@ -2062,7 +2048,7 @@ function navHTML() {
     {id:'profile',label:'Profil',icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`},
   ];
   const cur = screenHistory[screenHistory.length-1]||'home';
-  return `<nav style="display:flex;width:100%;background:#fff;border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom,0px)">
+  return `<nav style="display:flex;width:100%">
     ${items.map(it=>`
       <div class="nav-item ${cur===it.id?'active':''}" data-nav="${it.id}" onclick="goScreen('${it.id}')">
         <div style="position:relative">${it.icon}${it.badge?`<div class="nav-badge"></div>`:''}</div>
@@ -4806,9 +4792,8 @@ function toggleReminder() {
   function setVH() {
     var h = window.innerHeight || document.documentElement.clientHeight || 0;
     document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
-    // Tinggi #app TIDAK dihitung di sini (lihat #app: position:absolute +
-    // bottom:0). Cukup sinkronkan offset banner.
-    try { ikSyncBannerOffset(); } catch(e) {}
+    // Tinggi #app tidak dihitung di sini. Bottom nav sudah position:fixed
+    // sehingga selalu menempel di dasar viewport tanpa bantuan JS.
   }
   setVH();
   window.addEventListener('resize', setVH);
