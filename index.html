@@ -4974,6 +4974,38 @@ function toggleReminder() {
     L.push('hero pad-top     ' + css(hero, 'padding-top'));
     L.push('screen-content pT ' + css(document.querySelector('#scr-home .screen-content'), 'padding-top'));
     L.push('');
+    L.push('-- VIEWPORT UNITS --');
+    function vhU(u){
+      var d=document.createElement('div');
+      d.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:'+u;
+      document.body.appendChild(d);
+      var h=Math.round(d.getBoundingClientRect().height);
+      d.parentNode.removeChild(d);
+      return h;
+    }
+    L.push('100vh            ' + vhU('100vh'));
+    L.push('100dvh           ' + vhU('100dvh'));
+    L.push('100svh           ' + vhU('100svh'));
+    L.push('100lvh           ' + vhU('100lvh'));
+    L.push('docEl.clientH    ' + document.documentElement.clientHeight);
+    L.push('body.clientH     ' + document.body.clientHeight);
+    var vv2 = window.visualViewport;
+    L.push('vv.offsetTop     ' + (vv2 ? vv2.offsetTop : '-'));
+    L.push('vv.pageTop       ' + (vv2 ? vv2.pageTop : '-'));
+    L.push('screen.height    ' + screen.height);
+    L.push('screen.availH    ' + screen.availHeight);
+    L.push('SELISIH layar-vp ' + (screen.height - window.innerHeight) + 'px');
+    L.push('');
+    L.push('-- STATUS BAR / ATAS --');
+    var safeTopPx = parseFloat(envInset('top')) || 0;
+    var clock = document.getElementById('ik-clock');
+    if (clock) {
+      var cr = clock.getBoundingClientRect();
+      L.push('jam(#ik-clock).top ' + Math.round(cr.top) + (cr.top < safeTopPx ? '  <== TERTIMPA!' : '  (aman)'));
+    }
+    var notifBtn = document.getElementById('home-notif-btn');
+    if (notifBtn) { var nr2 = notifBtn.getBoundingClientRect(); L.push('tombol notif.top  ' + Math.round(nr2.top)); }
+    L.push('');
     L.push('-- DUMMY env (elemen) --');
     var dT = document.createElement('div'); dT.style.cssText='position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px)'; document.body.appendChild(dT);
     var dB = document.createElement('div'); dB.style.cssText='position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(dB);
@@ -4983,6 +5015,16 @@ function toggleReminder() {
 
     box.textContent = L.join('\n');
   }
+
+  // Strip visual untuk verifikasi mata:
+  // MERAH harus tepat menutupi jam status bar iOS.
+  // BIRU  harus tepat menutupi area home indicator (di bawah label nav).
+  var st = document.createElement('div');
+  st.style.cssText = 'position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:rgba(255,0,0,.30);z-index:2147483645;pointer-events:none';
+  document.body.appendChild(st);
+  var sb = document.createElement('div');
+  sb.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:env(safe-area-inset-bottom,0px);background:rgba(0,80,255,.30);z-index:2147483645;pointer-events:none';
+  document.body.appendChild(sb);
 
   render();
   window.addEventListener('resize', render);
