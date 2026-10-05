@@ -103,7 +103,14 @@ input,textarea,select{font-family:var(--font);outline:none;border:none;backgroun
 img{display:block}
 
 /* APP SHELL */
-#app{position:absolute;top:0;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+/* #app = app shell layar penuh.
+   PENTING: pakai position:fixed + top:0 + bottom:0 sehingga TINGGINYA
+   ditentukan langsung oleh viewport (initial containing block), bukan oleh
+   tinggi html/body. Di iOS standalone tinggi html/body kadang dilaporkan
+   lebih besar dari layar, dan kalau #app memakai height:100%/absolute maka
+   #app ikut memanjang -> bottom nav meleset keluar layar.
+   position:fixed + top/bottom:0 kebal terhadap masalah itu. */
+#app{position:fixed;top:0;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
 
 /* SCREENS */
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;position:relative}
@@ -727,6 +734,8 @@ function ikSyncBannerOffset(){
   if (!app) return;
   var b = document.getElementById('pwa-install-banner');
   var h = (b && b.getBoundingClientRect().height > 1) ? Math.round(b.getBoundingClientRect().height) : 0;
+  // `bottom` sengaja TIDAK disentuh (selalu 0 dari CSS) supaya nav selalu
+  // menempel di dasar viewport. Cukup geser `top` kalau banner aktif.
   app.style.top = h > 0 ? (h + 'px') : '';
 }
 window.addEventListener('resize', function(){ try{ ikSyncBannerOffset(); }catch(e){} });
