@@ -1008,6 +1008,7 @@ function showBanner() {
            milik Google), supaya tidak melewati halaman perantara
            firebaseapp.com yang bermasalah di iOS/Safari. -->
       <div id="ik-gsi-holder" style="display:flex;justify-content:center;min-height:44px;margin-bottom:12px"></div>
+      <p style="text-align:center;margin:-6px 0 12px"><a href="javascript:void(0)" onclick="ikShowLoginHelp()" style="font-size:12.5px;color:var(--muted);text-decoration:underline">Login gagal / tidak bisa masuk?</a></p>
       <p style="font-size:12.5px;color:var(--muted);line-height:1.55;text-align:center;margin-bottom:12px">Cukup satu klik. Akun baru otomatis dibuat dari akun Google Anda.</p>
       <button onclick="goScreen('home')" style="width:100%;text-align:center;color:var(--muted);font-size:14px;padding:10px;font-weight:500">Lanjut sebagai Tamu →</button>
     </div>
@@ -4653,6 +4654,18 @@ function ikRenderGisButton() {
       holder.innerHTML = '<p style="font-size:12.5px;color:var(--danger);text-align:center">' + ikGisErrMsg(e) + '</p>';
     }
   });
+}
+
+/* Tampilkan langkah perbaikan kalau login diblokir (mis. error
+   origin_mismatch / 'Access blocked: Authorization Error').
+   GIS melaporkan masalah ini di dalam iframe-nya sendiri, sehingga
+   tidak bisa ditangkap dari halaman ini — jadi disediakan tombol bantuan. */
+function ikShowLoginHelp() {
+  var host = location.host || 'domain ini';
+  var pesan = 'Login Google belum aktif untuk ' + host + '. '
+    + 'Pemilik aplikasi perlu menambahkan domain ini sebagai '
+    + 'Authorized JavaScript origin pada OAuth Client ID di Google Cloud Console.';
+  showToast(pesan, 'i');
 }
 
 /* Dipanggil saat layar login dibuka. */
