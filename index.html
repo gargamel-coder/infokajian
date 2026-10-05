@@ -4889,5 +4889,97 @@ function toggleReminder() {
     </div>
   </div>
 </div>
+
+<!-- ══════════ DEBUG PANEL (?debug=1) — SEMENTARA, HAPUS SETELAH SELESAI ══════════ -->
+<div id="ik-debug" style="display:none;position:fixed;top:0;left:0;right:0;z-index:2147483647;background:rgba(0,0,0,.88);color:#4ade80;font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));white-space:pre;max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch"></div>
+<script>
+(function(){
+  if (!/[?&]debug=1(&|$)/.test(location.search)) return;
+  var box = document.getElementById('ik-debug');
+  box.style.display = 'block';
+
+  function envInset(side){
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;padding-' + side + ':env(safe-area-inset-' + side + ',0px)';
+    document.body.appendChild(d);
+    var v = getComputedStyle(d).getPropertyValue('padding-' + side);
+    d.parentNode.removeChild(d);
+    return (v || '').trim() || '0px';
+  }
+  function rect(e){
+    if (!e) return '-';
+    var r = e.getBoundingClientRect();
+    return Math.round(r.top) + '..' + Math.round(r.bottom) + ' h' + Math.round(r.height);
+  }
+  function css(e, prop){ return e ? getComputedStyle(e).getPropertyValue(prop) : '-'; }
+
+  function render(){
+    var nav  = document.getElementById('gnav');
+    var app  = document.getElementById('app');
+    var hero = document.getElementById('home-hero');
+    var inner = nav ? nav.querySelector('nav') : null;
+    var item = nav ? nav.querySelector('.nav-item') : null;
+
+    // anak paling bawah di dalam nav (untuk tahu sisa putih di bawah label)
+    var lowest = '-', lowestBottom = 0;
+    if (nav) {
+      var kids = [].slice.call(nav.querySelectorAll('*'));
+      kids.forEach(function(k){
+        var r = k.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > lowestBottom) { lowestBottom = r.bottom; lowest = k.tagName + '.' + String(k.className || '').slice(0,18); }
+      });
+    }
+    var navR = nav ? nav.getBoundingClientRect() : null;
+
+    var L = [];
+    L.push('=== INFO KAJIAN DEBUG ===');
+    L.push('innerHeight      ' + window.innerHeight);
+    L.push('visualViewport   ' + (window.visualViewport ? Math.round(window.visualViewport.height) : '-') + '  offTop ' + (window.visualViewport ? Math.round(window.visualViewport.offsetTop) : '-'));
+    L.push('screen           ' + screen.width + 'x' + screen.height);
+    L.push('dpr              ' + window.devicePixelRatio);
+    L.push('display-mode     ' + (matchMedia('(display-mode: standalone)').matches ? 'STANDALONE' : 'browser'));
+    L.push('');
+    L.push('-- env() asli (diukur) --');
+    L.push('safe-area-top    ' + envInset('top'));
+    L.push('safe-area-bottom ' + envInset('bottom'));
+    L.push('');
+    L.push('-- NAV --');
+    L.push('nav.offsetHeight ' + (nav ? nav.offsetHeight : '-'));
+    L.push('nav.rect         ' + rect(nav));
+    L.push('nav height(css)  ' + css(nav, 'height'));
+    L.push('nav pad-top      ' + css(nav, 'padding-top'));
+    L.push('nav pad-bottom   ' + css(nav, 'padding-bottom'));
+    L.push('nav margin-bot   ' + css(nav, 'margin-bottom'));
+    L.push('inner<nav>.rect  ' + rect(inner));
+    L.push('.nav-item rect   ' + rect(item) + ' padB ' + css(item, 'padding-bottom'));
+    L.push('anak terbawah    ' + lowest + '  bottom ' + Math.round(lowestBottom));
+    L.push('SISA PUTIH DI BAWAH LABEL: ' + (navR ? Math.round(navR.bottom - lowestBottom) : '-') + 'px');
+    L.push('GAP nav ke dasar viewport: ' + (navR ? Math.round(window.innerHeight - navR.bottom) : '-') + 'px');
+    L.push('');
+    L.push('-- ATAS --');
+    L.push('app.rect         ' + rect(app));
+    L.push('#app pad-top     ' + css(app, 'padding-top'));
+    L.push('hero.rect        ' + rect(hero));
+    L.push('hero pad-top     ' + css(hero, 'padding-top'));
+    L.push('screen-content pT ' + css(document.querySelector('#scr-home .screen-content'), 'padding-top'));
+    L.push('');
+    L.push('-- DUMMY env (elemen) --');
+    var dT = document.createElement('div'); dT.style.cssText='position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px)'; document.body.appendChild(dT);
+    var dB = document.createElement('div'); dB.style.cssText='position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(dB);
+    L.push('dummy padding-top    ' + getComputedStyle(dT).paddingTop);
+    L.push('dummy padding-bottom ' + getComputedStyle(dB).paddingBottom);
+    dT.parentNode.removeChild(dT); dB.parentNode.removeChild(dB);
+
+    box.textContent = L.join('\n');
+  }
+
+  render();
+  window.addEventListener('resize', render);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', render);
+  setTimeout(render, 1200);
+  setTimeout(render, 3000);
+})();
+</script>
+
 </body>
 </html>
