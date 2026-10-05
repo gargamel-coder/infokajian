@@ -87,13 +87,15 @@ if (location.protocol === 'file:') {
   --shadow:0 4px 20px rgba(35,53,44,.06);
   --shadow2:0 10px 32px rgba(35,53,44,.10);
 }
-/* height:100% (BUKAN 100vh/100dvh). Background disamakan dengan warna nav
-   (putih) supaya area safe-area di bawah nav tidak terlihat beda warna. */
-/* STEP 3: pakai 100lvh (large viewport = tinggi layar fisik).
-   Di iOS standalone, innerHeight/100dvh bisa lebih pendek dari layar
-   (di sini 848 vs 896). 100lvh = 896 sehingga halaman menutupi layar penuh.
-   Fallback 100% untuk browser lama. Background = warna nav (step 4). */
-html,body{height:100%;height:100lvh;overflow:hidden;background:#fff}
+/* height:100dvh (dynamic viewport height) — SELALU mengikuti tinggi
+   viewport yang benar-benar terlihat, baik saat toolbar Safari muncul
+   maupun saat tersembunyi. JANGAN pakai 100lvh: di Safari 100lvh = tinggi
+   layar penuh (seolah toolbar disembunyikan) sehingga #app menjadi lebih
+   tinggi dari area yang terlihat dan bottom nav terdorong keluar layar
+   (terbukti: nav top 840 > viewport 720 => nav tidak muncul di Safari).
+   dvh didukung Safari 15.4+/Chrome 108+/Firefox 101+ (2022).
+   Fallback height:100% untuk browser lama. Background = warna nav. */
+html,body{height:100%;height:100dvh;overflow:hidden;background:#fff}
 body{position:relative}
 body{font-family:var(--font);color:var(--text);background:#fff;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 button{font-family:var(--font);cursor:pointer;border:none;outline:none;background:none;color:inherit;-webkit-tap-highlight-color:transparent}
@@ -101,11 +103,9 @@ input,textarea,select{font-family:var(--font);outline:none;border:none;backgroun
 img{display:block}
 
 /* APP SHELL
-   Bottom nav sekarang position:fixed (menempel viewport), jadi #app tidak
-   perlu trik tinggi apa pun. Cukup height:100% mengikuti html/body. */
-/* STEP 3: #app setinggi 100lvh juga, supaya nav (flex child terakhir)
-   duduk di dasar LAYAR FISIK (896), bukan di dasar layout viewport (848). */
-#app{max-width:430px;margin:0 auto;height:100%;height:100lvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+   #app mengikuti tinggi viewport terlihat (100dvh) sehingga nav sebagai
+   flex child terakhir selalu duduk di dasar area yang terlihat. */
+#app{max-width:430px;margin:0 auto;height:100%;height:100dvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 
 /* SCREENS */
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;position:relative}
@@ -116,12 +116,12 @@ img{display:block}
 
 /* BOTTOM NAV */
 #bnav,#bnav2,#bnav3,#bnav4{display:none!important}
-/* STEP 3: nav TIDAK lagi position:fixed (fixed menempel layout viewport
-   yang di iOS standalone lebih pendek 48px dari layar).
-   Sekarang nav = flex child terakhir dari #app yang tingginya 100lvh,
-   sehingga otomatis duduk di dasar layar fisik (896).
-   --nav-h didokumentasikan untuk referensi: 58px isi + safe-area + 1px border.
-   padding-bottom: env(safe-area-inset-bottom) tetap HANYA DI SINI (satu kali). */
+/* Nav = flex child terakhir dari #app (yang setinggi 100dvh = area yang
+   benar-benar terlihat), sehingga otomatis duduk di dasar area terlihat
+   di semua browser. JANGAN position:fixed: fixed menempel layout viewport
+   yang bisa lebih pendek/tinggi dari area terlihat di iOS.
+   --nav-h: 58px isi + safe-area + 1px border (dipakai untuk padding konten).
+   padding-bottom: env(safe-area-inset-bottom) HANYA di sini (satu kali). */
 #gnav{--nav-h:calc(58px + env(safe-area-inset-bottom,0px) + 1px);flex-shrink:0;width:100%;background:#fff;border-top:1px solid var(--border);display:flex;z-index:90;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 16px rgba(35,53,44,.08)}
 #gnav.hidden{display:none}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 4px 7px;gap:3px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;transition:color .2s;position:relative}
@@ -479,8 +479,8 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
   }
  
   /* Spacer agar konten di bawah tidak tertutup banner */
-  /* Spacer dibuat 0: banner install position:fixed (overlay), dan #app kini
-     setinggi 100lvh. Kalau spacer punya tinggi, ia mendorong #app ke bawah
+  /* Spacer dibuat 0: banner install position:fixed (overlay), dan #app
+     setinggi 100dvh. Kalau spacer punya tinggi, ia mendorong #app ke bawah
      sehingga nav bisa keluar layar. */
   .pwa-install-banner-spacer {
     height: 0 !important;
@@ -4691,6 +4691,17 @@ function doLogout() {
   state.subscriptions={speakers:[],mosques:[],contributors:[]};
   showToast('Berhasil keluar','s'); goScreen('home'); renderHome(); renderProfile();
 }
+/* Ikon untuk empty-state. Dipakai oleh emptyStateHTML() di 10 tempat.
+   Sebelumnya objek ini TIDAK PERNAH dideklarasikan sehingga memicu
+   ReferenceError dan layar Tersimpan / Pengingat / Kehadiran gagal render. */
+const EMPTY_ICONS = {
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+  mosque: '<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="width:32px;height:32px"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-5a3 3 0 0 1 6 0v5"/></svg>',
+};
 function emptyStateHTML(icon, title, sub, btn, action) {
   return `<div class="empty-state fi"><div class="empty-icon">${EMPTY_ICONS[icon]||EMPTY_ICONS.book}</div><div><p style="font-weight:700;font-size:17px;margin-bottom:6px">${title}</p>${sub?`<p style="font-size:14px;color:var(--muted);line-height:1.5">${sub}</p>`:''}</div>${btn?`<button class="btn btn-p btn-sm" onclick="${action}">${btn}</button>`:''}</div>`;
 }
@@ -5309,19 +5320,34 @@ function toggleReminder() {
 
 // Boot
 (async function() {
-  // Fix mobile viewport height (address bar issue)
+  // ── Tinggi viewport ────────────────────────────────────────────────
+  // CSS memakai 100dvh (viewport terlihat). Untuk browser lama yang belum
+  // mengenal dvh (iOS < 15.4, Chrome < 108), kita hitung manual dari
+  // visualViewport/innerHeight dan tulis ke --app-h, lalu CSS memakainya.
+  var _dvhOk = false;
+  try { _dvhOk = CSS.supports && CSS.supports('height', '100dvh'); } catch(e) {}
   function setVH() {
-    var h = window.innerHeight || document.documentElement.clientHeight || 0;
+    var vv = window.visualViewport;
+    var h = (vv && vv.height) ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0);
     document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
-    // Tinggi #app tidak dihitung di sini. Bottom nav sudah position:fixed
-    // sehingga selalu menempel di dasar viewport tanpa bantuan JS.
+    document.documentElement.style.setProperty('--app-h', h + 'px');
   }
   setVH();
   window.addEventListener('resize', setVH);
-  window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+  window.addEventListener('orientationchange', () => setTimeout(setVH, 120));
   // iOS Safari: address bar berubah memicu visualViewport resize
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', function(){ setTimeout(setVH, 50); });
+    window.visualViewport.addEventListener('scroll', function(){ setTimeout(setVH, 50); });
+  }
+  // Terapkan --app-h hanya kalau dvh tidak didukung (fallback aman).
+  if (!_dvhOk) {
+    var _applyFallback = function(){
+      var el = document.getElementById('app');
+      if (el) el.style.height = 'var(--app-h, 100vh)';
+    };
+    _applyFallback();
+    document.addEventListener('DOMContentLoaded', _applyFallback);
   }
 
   goScreen('home');
@@ -5412,35 +5438,34 @@ function toggleReminder() {
 </div>
 
 <script>
-/* ══════════ PENGAMAN NAV (step 3) ══════════
-   #app memakai 100lvh (tinggi layar fisik) supaya nav duduk di dasar LAYAR,
-   bukan di dasar layout viewport yang di iOS standalone lebih pendek 48px.
+/* ══════════ PENGAMAN NAV (step 3, diperbarui) ══════════
+   #app sekarang memakai 100dvh (tinggi viewport yang BENAR-BENAR terlihat),
+   jadi nav sebagai flex child terakhir sudah duduk tepat di dasar area
+   terlihat di semua browser — termasuk Safari saat toolbar muncul.
 
-   RISIKO: kalau 100lvh lebih tinggi dari area yang benar-benar terlihat,
-   nav akan terpotong di luar layar. Jadi setelah render kita UKUR:
-   kalau nav.bottom melebihi area terlihat, kembalikan nav ke position:fixed
-   (yang selalu terlihat), dan beri konten padding setinggi nav.
-   Dengan begini aman di kedua skenario. */
+   Pengaman ini hanya JARING PENGAMAN terakhir untuk kasus aneh (mis. browser
+   yang belum mengenal dvh dan gagal fallback): kalau nav ternyata benar-benar
+   tidak terlihat, pindahkan nav ke position:fixed supaya tetap bisa dipakai,
+   DAN beri konten padding setinggi nav supaya isi paling bawah tidak
+   tertutup. Sebelumnya --nav-h di-set 0 di cabang ini sehingga konten
+   tertutup nav. */
 (function(){
   function ikNavSafety(){
     var nav = document.getElementById('gnav');
     var app = document.getElementById('app');
     if (!nav || !app) return;
     var vv = window.visualViewport;
-    // Dasar viewport yang dilaporkan (ambil yang paling besar dari semua sumber)
     var visBottom = Math.max(
       window.innerHeight || 0,
       document.documentElement.clientHeight || 0,
       (vv && vv.height) || 0
     );
     var r = nav.getBoundingClientRect();
-    // Trip HANYA kalau nav benar-benar TIDAK terlihat (mulai di/di bawah dasar
-    // viewport). Kalau nav masih sebagian terlihat, biarkan: itu justru kondisi
-    // yang mau kita perbaiki (nav duduk di dasar layar fisik).
+    // Trip HANYA kalau nav benar-benar TIDAK terlihat sama sekali.
     var terpotong = r.height > 0 && r.top >= visBottom - 4;
 
     if (terpotong) {
-      // Nav tidak muat -> pakai position:fixed (selalu terlihat)
+      // Nav tidak muat -> pakai position:fixed (selalu terlihat) + padding konten.
       nav.style.position = 'fixed';
       nav.style.bottom = '0';
       nav.style.left = '0';
@@ -5448,9 +5473,13 @@ function toggleReminder() {
       nav.style.maxWidth = '430px';
       nav.style.margin = '0 auto';
       nav.style.width = '100%';
-      document.documentElement.style.setProperty('--nav-h', (nav.offsetHeight || 0) + 'px');
+      var nh = (nav.offsetHeight || 0);
+      document.documentElement.style.setProperty('--nav-h', nh + 'px');
+      document.querySelectorAll('.screen-content').forEach(function(sc){
+        sc.style.paddingBottom = 'calc(' + nh + 'px + 12px)';
+      });
     } else {
-      // Nav muat di dalam #app (100lvh) -> biarkan sebagai flex child
+      // Nav muat sebagai flex child -> bersihkan override.
       nav.style.position = '';
       nav.style.bottom = '';
       nav.style.left = '';
@@ -5459,6 +5488,9 @@ function toggleReminder() {
       nav.style.margin = '';
       nav.style.width = '';
       document.documentElement.style.setProperty('--nav-h', '0px');
+      document.querySelectorAll('.screen-content').forEach(function(sc){
+        sc.style.paddingBottom = '';
+      });
     }
     return terpotong;
   }
