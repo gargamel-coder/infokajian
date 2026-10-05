@@ -4585,6 +4585,23 @@ function ikRenderGisButton() {
       holder.innerHTML = '<p style="font-size:12.5px;color:var(--danger);text-align:center">Gagal memuat Google Sign-In. Periksa koneksi internet lalu muat ulang halaman.</p>';
       return;
     }
+    /* GIS hanya menulis error ke console (mis. origin belum diizinkan),
+       sehingga user cuma melihat tombol yang tidak bereaksi. Tangkap
+       pesan itu sebentar, lalu tampilkan ke user kalau memang error. */
+    var _origErr = console.error.bind(console);
+    var _originErr = false;
+    console.error = function () {
+      var s = Array.prototype.join.call(arguments, ' ');
+      if (s.indexOf('GSI_LOGGER') >= 0 && /origin/i.test(s)) _originErr = true;
+      _origErr.apply(console, arguments);
+    };
+    setTimeout(function () {
+      console.error = _origErr;
+      if (_originErr && holder) {
+        holder.innerHTML = '<p style="font-size:12.5px;color:var(--danger);text-align:center;line-height:1.55">Domain <b>'
+          + location.host + '</b> belum terdaftar di Google Cloud Console.<br>Tambahkan sebagai <b>Authorized JavaScript origin</b> pada OAuth Client ID, lalu muat ulang.</p>';
+      }
+    }, 5000);
     try {
       google.accounts.id.initialize({
         client_id: IK_GOOGLE_CLIENT_ID,
