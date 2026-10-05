@@ -1096,9 +1096,13 @@ function showBanner() {
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="width:20px;height:20px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span style="font-size:11px;font-weight:700;color:var(--muted)">Pengingat</span>
           </button>
-          <button onclick="shareKajian()" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <button onclick="ikBagikanPoster()" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="width:20px;height:20px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             <span style="font-size:11px;font-weight:700;color:var(--muted)">Bagikan</span>
+          </button>
+          <button onclick="ikUnduhPoster()" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="width:20px;height:20px"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span style="font-size:11px;font-weight:700;color:var(--muted)">Poster</span>
           </button>
         </div>
         <div class="cal-row" id="detail-cal-row">
@@ -2837,12 +2841,12 @@ function renderDetail(id) {
   if(k.status==='postponed') alertEl.innerHTML = `<div class="alert-banner alert-o"><svg viewBox="0 0 24 24" fill="none" stroke="#BF360C" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p style="font-size:13px;color:#BF360C;font-weight:600">Kajian ini sedang ditunda. Pantau terus untuk informasi terbaru.</p></div>`;
   else if(k.status==='cancelled') alertEl.innerHTML = `<div class="alert-banner alert-r"><svg viewBox="0 0 24 24" fill="none" stroke="#B71C1C" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p style="font-size:13px;color:#B71C1C;font-weight:600">Kajian ini telah dibatalkan.</p></div>`;
   else alertEl.innerHTML = '';
-  // Actions
+  // Actions — SELALU tampil supaya kartu kajian bisa dibagikan/diunduh
+  // oleh siapa saja (tanpa login). Simpan & Pengingat tetap meminta login
+  // lewat toast kalau belum masuk.
   const actEl = document.getElementById('detail-actions');
-  if(state.user) {
-    actEl.style.display='block';
-    updateDetailActions();
-  } else actEl.style.display='none';
+  actEl.style.display='block';
+  if(state.user) updateDetailActions();
   // Edit/Del button — hanya pemilik kajian atau admin
   const ew=document.getElementById('detail-edit-wrap');
   if(ew){
@@ -2905,12 +2909,223 @@ function renderAttendButton(k, distToMq) {
 
 function toggleBookmark() { if(!state.user){showToast('Login untuk menyimpan kajian','i');return;} toggleBookmarkById(state.currentKajianId); updateDetailActions(); }
 function toggleReminder() { if(!state.user){showToast('Login untuk pengingat','i');return;} toggleReminderById(state.currentKajianId); updateDetailActions(); }
+/* ══════════════════════════════════════════════════════════════════════
+   POSTER KAJIAN — generate poster minimalis modern (1080x1350) sesuai
+   gaya visual web (Celadon), lalu dibagikan / diunduh sebagai PNG.
+   Alur: data kajian -> SVG -> canvas -> PNG blob.
+   ══════════════════════════════════════════════════════════════════════ */
+function ikPosterEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* Bungkus teks jadi beberapa baris (SVG tidak punya auto-wrap).
+   maxChars = perkiraan jumlah karakter per baris. */
+function ikPosterWrap(text, maxChars, maxLines){
+  var words = String(text==null?'':text).split(/\s+/).filter(Boolean);
+  var lines = [], cur = '';
+  for (var i=0;i<words.length;i++){
+    var w = words[i], test = cur ? cur+' '+w : w;
+    if (test.length > maxChars && cur){ lines.push(cur); cur = w; }
+    else cur = test;
+    if (maxLines && lines.length >= maxLines) break;
+  }
+  if (cur && (!maxLines || lines.length < maxLines)) lines.push(cur);
+  if (!lines.length) lines = [''];
+  // kalau dipotong, tambahkan elipsis di baris terakhir
+  if (maxLines && lines.length === maxLines){
+    var total = words.join(' ');
+    var shown = lines.join(' ');
+    if (total.length > shown.length) lines[maxLines-1] = lines[maxLines-1].replace(/\s*\S*$/,'') + '…';
+  }
+  return lines;
+}
+
+/* Ikon garis monoline (sama gaya dengan ikon di web) */
+function ikPIcon(name, x, y, size, color){
+  var paths = {
+    book:     '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>',
+    clock:    '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    pin:      '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'
+  };
+  var sc = size/24;
+  return '<g transform="translate('+x+','+y+') scale('+sc+')" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||'')+'</g>';
+}
+
+/* Susun string SVG poster.
+   Konten (judul + baris info) dibangun dengan koordinat lokal mulai y=0,
+   lalu DIGESER agar seimbang secara vertikal di antara pill atas dan footer.
+   Ini menghindari area kosong besar di tengah poster. */
+function ikPosterSVGString(k){
+  var spk = getSpeaker(k.speaker_id), msq = getMosque(k.mosque_id);
+  var sub = DB.users.find(function(u){ return u.id === k.submitted_by; });
+
+  var W=1080, H=1350, PAD=76;
+  var IC='#3F7D50', TXT='#1F3128', MUT='#5F7A6C', LN='#D2E5DA', PL='#EAF7EA', BG='#F4FBF4';
+  var FF="system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+  var head=[], body=[];
+  var cy = 0;   // kursor vertikal LOKAL untuk blok konten
+
+  // ── Judul kajian ──
+  var titleLines = ikPosterWrap(k.title, 22, 3);
+  var TLH = 88, TFS = 72;
+  head.push('<text font-family="'+FF+'" font-size="'+TFS+'" font-weight="800" fill="'+TXT+'">');
+  titleLines.forEach(function(ln,i){
+    head.push('<tspan x="'+PAD+'" y="'+(cy + TFS + i*TLH)+'">'+ikPosterEsc(ln)+'</tspan>');
+  });
+  head.push('</text>');
+  cy += TFS + (titleLines.length-1)*TLH + 54;   // dasar judul + jarak
+
+  head.push('<line x1="'+PAD+'" y1="'+cy+'" x2="'+(W-PAD)+'" y2="'+cy+'" stroke="'+LN+'" stroke-width="2"/>');
+  cy += 56;
+
+  // ── Baris info ──
+  var rows=[];
+  if (spk) rows.push({icon:'book', label:'PEMBICARA', val: spk.full_name + (spk.verified?' ✓':'')});
+  rows.push({icon:'calendar', label:'TANGGAL', val: fmtDateLong(k.date)});
+  rows.push({icon:'clock', label:'WAKTU', val: k.time + ' WIB'});
+  if (msq) rows.push({icon:'pin', label:'LOKASI', val: msq.name});
+
+  var ICON=82, GAP=46;
+  rows.forEach(function(r,idx){
+    body.push('<rect x="'+PAD+'" y="'+cy+'" width="'+ICON+'" height="'+ICON+'" rx="24" fill="'+PL+'"/>');
+    body.push(ikPIcon(r.icon, PAD+(ICON-44)/2, cy+(ICON-44)/2, 44, IC));
+    body.push('<text x="'+(PAD+ICON+28)+'" y="'+(cy+28)+'" font-family="'+FF+'" font-size="20" font-weight="700" fill="'+MUT+'" letter-spacing="1.7">'+r.label+'</text>');
+    var vl = ikPosterWrap(r.val, 31, 2);
+    body.push('<text font-family="'+FF+'" font-size="33" font-weight="700" fill="'+TXT+'">');
+    vl.forEach(function(ln,i){
+      body.push('<tspan x="'+(PAD+ICON+28)+'" y="'+(cy+66+i*40)+'">'+ikPosterEsc(ln)+'</tspan>');
+    });
+    body.push('</text>');
+    var rowH = Math.max(ICON, 66 + (vl.length-1)*40);
+    cy += rowH + (idx < rows.length-1 ? GAP : 0);
+  });
+
+  // ── Posisi vertikal: seimbangkan blok konten ──
+  var contentH = cy;                      // tinggi total blok konten
+  var topLimit = 232;                     // batas atas (di bawah pill)
+  var footerLineY = H - 132;              // garis footer
+  var botLimit = footerLineY - 40;        // batas bawah konten
+  var avail = botLimit - topLimit;
+  var dy = topLimit + Math.max(0, (avail - contentH)/2);
+  if (contentH > avail) dy = topLimit;    // kalau kepanjangan, tempel atas
+
+  var o=[];
+  o.push('<rect width="'+W+'" height="'+H+'" fill="'+BG+'"/>');
+  o.push('<circle cx="1010" cy="120" r="210" fill="'+PL+'" opacity="0.7"/>');
+  o.push('<circle cx="70" cy="1240" r="180" fill="'+PL+'" opacity="0.6"/>');
+  o.push('<defs><linearGradient id="ikg" x1="0" y1="0" x2="1" y2="0">'
+        +'<stop offset="0" stop-color="#AFE1AF"/><stop offset="1" stop-color="#8FCC8F"/>'
+        +'</linearGradient></defs>');
+  o.push('<rect width="'+W+'" height="14" fill="url(#ikg)"/>');
+
+  // Brand pill
+  var y0=120;
+  o.push('<rect x="'+PAD+'" y="'+y0+'" width="236" height="56" rx="28" fill="'+PL+'"/>');
+  o.push('<text x="'+(PAD+118)+'" y="'+(y0+37)+'" text-anchor="middle" font-family="'+FF+'" font-size="21" font-weight="800" fill="'+IC+'" letter-spacing="2.5">INFO KAJIAN</text>');
+  // Topik pill
+  var topic = k.topic || 'Kajian';
+  var tw = Math.min(330, 50 + topic.length*13);
+  o.push('<rect x="'+(W-PAD-tw)+'" y="'+y0+'" width="'+tw+'" height="56" rx="28" fill="#fff" stroke="'+LN+'" stroke-width="2"/>');
+  o.push('<text x="'+(W-PAD-tw/2)+'" y="'+(y0+37)+'" text-anchor="middle" font-family="'+FF+'" font-size="21" font-weight="700" fill="'+MUT+'">'+ikPosterEsc(topic)+'</text>');
+
+  // Blok konten (judul + baris), digeser seimbang
+  o.push('<g transform="translate(0,'+Math.round(dy)+')">'+head.join('')+body.join('')+'</g>');
+
+  // Footer
+  o.push('<line x1="'+PAD+'" y1="'+footerLineY+'" x2="'+(W-PAD)+'" y2="'+footerLineY+'" stroke="'+LN+'" stroke-width="2"/>');
+  o.push('<text x="'+PAD+'" y="'+(footerLineY+56)+'" font-family="'+FF+'" font-size="27" font-weight="800" fill="'+IC+'">infokajian.app</text>');
+  if (sub && sub.name){
+    o.push('<text x="'+(W-PAD)+'" y="'+(footerLineY+56)+'" text-anchor="end" font-family="'+FF+'" font-size="19" font-weight="600" fill="'+MUT+'">'+ikPosterEsc('oleh ' + sub.name)+'</text>');
+  }
+
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+o.join('')+'</svg>';
+}
+
+/* SVG -> PNG Blob */
+function ikPosterBlob(k, cb){
+  var svg, url;
+  try { svg = ikPosterSVGString(k); } catch(e){ cb(null); return; }
+  url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  var img = new Image();
+  img.onload = function(){
+    try {
+      var c = document.createElement('canvas');
+      c.width = 1080; c.height = 1350;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#F4FBF4';
+      ctx.fillRect(0,0,1080,1350);
+      ctx.drawImage(img, 0, 0, 1080, 1350);
+      if (c.toBlob) c.toBlob(function(b){ cb(b); }, 'image/png');
+      else cb(null);
+    } catch(e){ cb(null); }
+  };
+  img.onerror = function(){ cb(null); };
+  img.src = url;
+}
+
+function ikPosterFilename(k){
+  var s = String(k.title||'kajian').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+  return 'kajian-' + (s||'poster') + '.png';
+}
+
+function ikDownloadBlob(blob, name){
+  var a = document.createElement('a');
+  var u = URL.createObjectURL(blob);
+  a.href = u; a.download = name;
+  a.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ try{ URL.revokeObjectURL(u); a.remove(); }catch(e){} }, 1500);
+}
+
+function ikUnduhPoster(){
+  var id = state.currentKajianId; if(!id) return;
+  var k = DB.kajian.find(function(x){ return x.id===id; }); if(!k) return;
+  showToast('Membuat poster…', 'i');
+  ikPosterBlob(k, function(blob){
+    if (!blob){ showToast('Gagal membuat poster', 'e'); return; }
+    ikDownloadBlob(blob, ikPosterFilename(k));
+    showToast('Poster diunduh ✅', 's');
+  });
+}
+
+function ikBagikanPoster(){
+  var id = state.currentKajianId; if(!id) return;
+  var k = DB.kajian.find(function(x){ return x.id===id; }); if(!k) return;
+  var shareUrl = 'https://infokajian.app?kajian=' + encodeURIComponent(id);
+  showToast('Membuat poster…', 'i');
+  ikPosterBlob(k, function(blob){
+    if (blob && navigator.canShare){
+      try {
+        var file = new File([blob], ikPosterFilename(k), {type:'image/png'});
+        if (navigator.canShare({files:[file]})){
+          navigator.share({
+            files: [file],
+            title: '📚 ' + k.title,
+            text: 'Info Kajian: ' + k.title + '\n' + shareUrl
+          }).then(function(){ showToast('Poster dibagikan ✅', 's'); })
+            .catch(function(e){ if (e && e.name !== 'AbortError') showToast('Gagal membagikan', 'e'); });
+          return;
+        }
+      } catch(e){}
+    }
+    // Fallback: unduh saja (share file tidak didukung)
+    if (blob){ ikDownloadBlob(blob, ikPosterFilename(k)); showToast('Poster diunduh ✅', 's'); }
+    else showToast('Gagal membuat poster', 'e');
+  });
+}
+
 function shareKajian() {
   const id = state.currentKajianId;
   if (!id) return;
   const k = DB.kajian.find(x => x.id === id);
   if (!k) return;
   const spk = getSpeaker(k.speaker_id), msq = getMosque(k.mosque_id);
+  const submitter = DB.users.find(u => u.id === k.submitted_by);
 
   // Bangun deep link URL — selalu arahkan ke domain resmi
   const shareUrl = 'https://infokajian.app?kajian=' + encodeURIComponent(id);
@@ -2925,6 +3140,8 @@ function shareKajian() {
     '📅 Tanggal: ' + fmtDateLong(k.date),
     '🕐 Waktu: ' + k.time + ' WIB',
     msq ? '📍 Lokasi: ' + msq.name : null,
+    msq && msq.address ? '🏠 ' + msq.address : null,
+    submitter ? '✍️ Kontributor: ' + submitter.name : null,
     '',
     '🔗 ' + shareUrl,
     '',
