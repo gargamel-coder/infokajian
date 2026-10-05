@@ -1556,6 +1556,7 @@ function _onFirebaseReady() {
     } catch(e) {}
     startRealtimeListeners();
     try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e) {}
+    try { ikHandleRedirectResult(); } catch(e) {}
     auth.onAuthStateChanged(async function(user) {
       if (user) {
         var u = DB.users.find(function(x) { return x.id === user.uid; });
@@ -4478,55 +4479,97 @@ function renderProfile() {
 // ══════════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════════
-function doGoogleLogin() {
-  const btn = document.getElementById('google-btn-text');
-  const _auth = getAuth();
-  if (!_auth) {
-    showToast('SDK Firebase gagal dimuat. Periksa koneksi internet.', 'e');
-    return;
+/* Simpan/sinkronkan user hasil login Google, lalu masuk ke aplikasi.
+   Dipakai bersama oleh alur popup maupun redirect. */
+async function ikFinishGoogleLogin(user) {
+  if (!user) return;
+  const uid = user.uid;
+  let u = DB.users.find(x => x.id === uid);
+  if (!u) {
+    try {
+      const doc = await db.collection('users').doc(uid).get();
+      if (doc.exists) { var dd = doc.data(); dd.id = uid; u = dd; }
+    } catch (e) { console.warn('fetch user error:', e); }
   }
+  if (!u) {
+    var isAdm = user.email === 'syahlanxzaelani@gmail.com';
+    u = {
+      id: uid, email: user.email || '',
+      name: isAdm ? 'Syahlan Jailani' : (user.displayName || (user.email || '').split('@')[0]),
+      role: isAdm ? 'admin' : 'user', created_at: T, photo: user.photoURL || ''
+    };
+    await fsSet('users', uid, u);
+  }
+  if (!DB.users.find(x => x.id === uid)) DB.users.push(u);
+  state.user = u;
+  startUserDataListener(uid);
+  showToast('Selamat datang, ' + ((u.name || u.email || '').split(' ')[0]) + '!', 's');
+  goScreen('home'); renderHome(); injectNavs();
+  if (state.notifPermission === 'granted') {
+    setTimeout(async function () { await initFCM(); await getFCMTokenAndSave(); }, 1000);
+  }
+}
+
+/* Terjemahkan error Firebase Auth jadi pesan yang bisa dimengerti. */
+function ikGoogleErrMsg(err) {
+  const c = err && err.code;
+  if (c === 'auth/operation-not-allowed')
+    return 'Google Sign-In belum diaktifkan di Firebase Console (Authentication > Sign-in method > Google).';
+  if (c === 'auth/unauthorized-domain')
+    return 'Domain ini belum diizinkan di Firebase Console (Authentication > Settings > Authorized domains).';
+  if (c === 'auth/popup-blocked')
+    return 'Popup diblokir browser. Izinkan popup lalu coba lagi.';
+  if (c === 'auth/operation-not-supported-in-this-environment')
+    return 'Browser ini tidak mendukung popup. Coba lagi, akan dialihkan otomatis.';
+  if (c === 'auth/network-request-failed')
+    return 'Gagal terhubung ke server. Periksa koneksi internet.';
+  if (c === 'auth/account-exists-with-different-credential')
+    return 'Email ini sudah terdaftar dengan metode login lain.';
+  return 'Gagal masuk: ' + ((err && (err.message || err.code)) || 'kesalahan tidak diketahui');
+}
+
+function ikGoogleBtnReset() {
+  const btn = document.getElementById('google-btn-text');
+  if (btn) btn.textContent = 'Masuk dengan Google';
+}
+
+function doGoogleLogin() {
+  const _auth = getAuth();
+  if (!_auth) { showToast('SDK Firebase gagal dimuat. Periksa koneksi internet.', 'e'); return; }
+  const btn = document.getElementById('google-btn-text');
   if (btn) btn.innerHTML = '<div class="spin" style="width:20px;height:20px;border-width:2px"></div>';
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+
   _auth.signInWithPopup(provider)
-    .then(async cred => {
-      const user = cred.user, uid = user.uid;
-      let u = DB.users.find(x => x.id === uid);
-      if (!u) {
-        try {
-          const doc = await db.collection('users').doc(uid).get();
-          if (doc.exists) { var dd = doc.data(); dd.id = uid; u = dd; }
-        } catch (e) { console.warn('fetch user error:', e); }
-      }
-      if (!u) {
-        var isAdm = user.email === 'syahlanxzaelani@gmail.com';
-        u = {
-          id: uid, email: user.email || '',
-          name: isAdm ? 'Syahlan Jailani' : (user.displayName || (user.email || '').split('@')[0]),
-          role: isAdm ? 'admin' : 'user', created_at: T, photo: user.photoURL || ''
-        };
-        await fsSet('users', uid, u);
-      }
-      if (!DB.users.find(x => x.id === uid)) DB.users.push(u);
-      state.user = u;
-      startUserDataListener(uid);
-      showToast('Selamat datang, ' + ((u.name || u.email || '').split(' ')[0]) + '!', 's');
-      goScreen('home'); renderHome(); injectNavs();
-      if (state.notifPermission === 'granted') {
-        setTimeout(async function () { await initFCM(); await getFCMTokenAndSave(); }, 1000);
-      }
-      if (btn) btn.textContent = 'Masuk dengan Google';
-    })
+    .then(async cred => { await ikFinishGoogleLogin(cred.user); ikGoogleBtnReset(); })
     .catch(err => {
-      if (btn) btn.textContent = 'Masuk dengan Google';
       const c = err && err.code;
-      // Pengguna menutup popup sendiri — bukan error, jangan dikasih toast
-      if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return;
-      if (c === 'auth/popup-blocked') { showToast('Popup diblokir browser. Izinkan popup lalu coba lagi.', 'e'); return; }
-      if (c === 'auth/unauthorized-domain') { showToast('Domain ini belum diizinkan di Firebase Console.', 'e'); return; }
-      if (c === 'auth/operation-not-supported-in-this-environment') { showToast('Google Sign-In tidak didukung di browser ini. Coba buka di Chrome/Safari.', 'e'); return; }
-      showToast('Gagal masuk: ' + (err.message || c || 'kesalahan tidak diketahui'), 'e');
+      // User menutup popup sendiri — bukan error
+      if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') { ikGoogleBtnReset(); return; }
+      // Popup tidak bisa dipakai (umum di iOS/Safari & PWA standalone):
+      // alihkan ke alur redirect halaman penuh.
+      if (c === 'auth/popup-blocked' || c === 'auth/operation-not-supported-in-this-environment' || c === 'auth/web-storage-unsupported') {
+        showToast('Mengalihkan ke halaman Google…', 'i');
+        _auth.signInWithRedirect(provider).catch(e2 => { ikGoogleBtnReset(); showToast(ikGoogleErrMsg(e2), 'e'); });
+        return;
+      }
+      ikGoogleBtnReset();
+      showToast(ikGoogleErrMsg(err), 'e');
     });
+}
+
+/* Selesaikan login kalau halaman kembali dari redirect Google. */
+function ikHandleRedirectResult() {
+  const _auth = getAuth();
+  if (!_auth || !_auth.getRedirectResult) return;
+  _auth.getRedirectResult().then(async res => {
+    if (res && res.user) await ikFinishGoogleLogin(res.user);
+  }).catch(err => {
+    const c = err && err.code;
+    if (c === 'auth/no-auth-event') return;
+    showToast(ikGoogleErrMsg(err), 'e');
+  });
 }
 
 function doLogout() {
