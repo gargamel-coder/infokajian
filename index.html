@@ -2921,15 +2921,71 @@ function ikPosterEsc(s){
 
 /* Ukur lebar teks pakai canvas supaya wrapping akurat (bukan tebakan). */
 var _ikMC = null;
+var IK_FF = "'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+
+/* Ukur lebar teks pakai font yang SAMA dengan yang dipakai poster. */
 function ikMeasure(text, fs, weight, family){
   if (!_ikMC) _ikMC = document.createElement('canvas').getContext('2d');
-  _ikMC.font = (weight||'700') + ' ' + fs + 'px ' + family;
+  _ikMC.font = (weight||'700') + ' ' + fs + 'px ' + (family||IK_FF);
   return _ikMC.measureText(String(text==null?'':text)).width;
+}
+
+/* ── Font untuk poster ──
+   SVG yang dirender sebagai <img> TIDAK bisa memakai font dari <link>
+   Google Fonts: browser diam-diam jatuh ke font sistem. Akibatnya lebar
+   teks di poster beda dari hasil ikMeasure() -> posisi meleset, dan poster
+   tampil beda-beda di tiap HP. Jadi font ditanam (base64) ke dalam SVG.
+   Hasil di-cache supaya cuma diunduh sekali. */
+var _ikFontCSS = null;
+function ikLoadFontCSS(cb){
+  if (_ikFontCSS !== null){ cb(_ikFontCSS); return; }
+  if (!window.fetch || !window.btoa){ _ikFontCSS=''; cb(''); return; }
+  var url = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap';
+  var selesai = false;
+  var timer = setTimeout(function(){ if(!selesai){ selesai=true; _ikFontCSS=''; cb(''); } }, 8000);
+  fetch(url).then(function(r){ return r.text(); }).then(function(css){
+    var blok = [...css.matchAll(/\/\*\s*([\w-]+)\s*\*\/\s*(@font-face\s*\{[^}]+\})/g)]
+      .filter(function(m){ return m[1] === 'latin'; })
+      .map(function(m){ return m[2]; });
+    var urls = [...new Set(blok.map(function(b){
+      var mm = b.match(/url\((https:\/\/[^)]+)\)/); return mm ? mm[1] : null;
+    }).filter(Boolean))];
+    return Promise.all(urls.map(function(u){
+      return fetch(u).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
+        var bin = '', bytes = new Uint8Array(ab);
+        for (var i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+        return { u:u, d:window.btoa(bin) };
+      });
+    })).then(function(list){
+      var map = {}; list.forEach(function(x){ map[x.u] = x.d; });
+      return blok.join('').replace(/url\((https:\/\/[^)]+)\)/g, function(_, u){
+        return map[u] ? 'url(data:font/woff2;base64,'+map[u]+')' : 'url('+u+')';
+      });
+    });
+  }).then(function(out){
+    if (selesai) return; selesai=true; clearTimeout(timer);
+    _ikFontCSS = out || ''; cb(_ikFontCSS);
+  }).catch(function(){
+    if (selesai) return; selesai=true; clearTimeout(timer);
+    _ikFontCSS = ''; cb('');
+  });
 }
 
 /* Bungkus teks berdasarkan LEBAR PIXEL sebenarnya. */
 function ikWrapPx(text, fs, weight, family, maxW, maxLines){
-  var words = String(text==null?'':text).split(/\s+/).filter(Boolean);
+  // Kata yang sendirian lebih lebar dari maxW harus dipotong paksa,
+  // kalau tidak teksnya meluber keluar margin poster.
+  var words = [];
+  String(text==null?'':text).split(/\s+/).filter(Boolean).forEach(function(w){
+    if (ikMeasure(w, fs, weight, family) <= maxW){ words.push(w); return; }
+    var chunk = '';
+    for (var ci=0; ci<w.length; ci++){
+      var test = chunk + w[ci];
+      if (ikMeasure(test, fs, weight, family) > maxW && chunk){ words.push(chunk); chunk = w[ci]; }
+      else chunk = test;
+    }
+    if (chunk) words.push(chunk);
+  });
   if (!words.length) return [''];
   var lines = [], cur = '';
   for (var i=0;i<words.length;i++){
@@ -3126,7 +3182,7 @@ function ikPosterDate(s){
      arch lancip: luar x678..995 apex y48, dalam x726..947 apex y103, kaki y353
      bulan sabit: pusat ~(836,197) warna latar #F4F9F0
    ══════════════════════════════════════════════════════════════════════ */
-function ikPosterSVGString(k){
+function ikPosterSVGString(k, fontCss){
   var spk = getSpeaker(k.speaker_id), msq = getMosque(k.mosque_id);
   var sub = DB.users.find(function(u){ return u.id === k.submitted_by; });
 
@@ -3134,7 +3190,7 @@ function ikPosterSVGString(k){
   var BG='#F4F9F0', TEAL='#14352A', GREEN='#2E7D55', PILLTX='#1F5C3F';
   var LBL='#5E7F6B', FOOT='#7A9A86';
   var PILL='#DDF0D9', ARCH_OUT='#DDF0D9', ARCH_IN='#AFE1AF', DIV='#D6EDD3';
-  var FF="'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+  var FF=IK_FF;
   var CW = W - 2*PAD;      // 888
   var COL2 = 631;
 
@@ -3142,7 +3198,7 @@ function ikPosterSVGString(k){
   var tfs = 112, tlines = null, TMAXW = 600;
   while (tfs >= 56){
     var pr = ikWrapPx(k.title, tfs, '800', FF, TMAXW, 999);
-    if (pr.length <= 3){ tlines = pr; break; }
+    if (pr.length <= 3 && pr.every(function(l){ return ikMeasure(l, tfs, '800', FF) <= TMAXW; })){ tlines = pr; break; }
     tfs -= 4;
   }
   if (!tlines) tlines = ikWrapPx(k.title, 56, '800', FF, TMAXW, 3);
@@ -3214,7 +3270,7 @@ function ikPosterSVGString(k){
     }
   }
 
-  // ── Baris bawah tengah: Sumber (nama akun Instagram kajian) ──
+  // ── Pojok kanan bawah: Sumber (nama akun Instagram kajian) ──
   // Diisi dari field 'Sumber' saat submit; kalau kosong, pakai akun IG
   // masjid sebagai cadangan. Menggantikan nama kontributor.
   var srcRaw = k.source || (msq && (msq.instagram || msq.ig)) || '';
@@ -3225,20 +3281,24 @@ function ikPosterSVGString(k){
   if (/[A-Za-z0-9]/.test(handle)){
     var lb = 'Sumber:';
     var lw = ikMeasure(lb,24,'600',FF), hw = ikMeasure('@'+handle,24,'700',FF);
-    var sx = (W - (lw + 42 + hw))/2, sy = 1283;
+    var bw = lw + 42 + hw;              // lebar total blok
+    var sx = W - PAD - bw, sy = 1283;   // rata kanan di margin poster
     o.push('<text x="'+sx+'" y="'+sy+'" font-family="'+FF+'" font-size="24" font-weight="600" fill="'+FOOT+'">'+lb+'</text>');
     o.push(ikPIcon('instagram', sx+lw+9, sy-20, 25, LBL, 1.8));
     o.push('<text x="'+(sx+lw+42)+'" y="'+sy+'" font-family="'+FF+'" font-size="24" font-weight="700" fill="'+LBL+'">'+ikPosterEsc('@'+handle)+'</text>');
   }
 
 
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+o.join('')+'</svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'
+    + (fontCss ? '<defs><style type="text/css">'+fontCss+'</style></defs>' : '')
+    + o.join('')+'</svg>';
 }
 
 /* SVG -> PNG Blob */
 function ikPosterBlob(k, cb){
+  ikLoadFontCSS(function(fontCss){
   var svg, url;
-  try { svg = ikPosterSVGString(k); } catch(e){ cb(null); return; }
+  try { svg = ikPosterSVGString(k, fontCss); } catch(e){ cb(null); return; }
   url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   var img = new Image();
   img.onload = function(){
@@ -3255,6 +3315,7 @@ function ikPosterBlob(k, cb){
   };
   img.onerror = function(){ cb(null); };
   img.src = url;
+  });
 }
 
 function ikPosterFilename(k){
