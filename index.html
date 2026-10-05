@@ -4530,7 +4530,7 @@ async function ikFinishGoogleLogin(user) {
    origin di Google Cloud Console / Firebase Authentication > Google. */
 var IK_GOOGLE_CLIENT_ID = '175043780829-sr3smu37a66jm58ti4ui5654851p3dnr.apps.googleusercontent.com';
 
-var _ikGisReady = false, _ikGisLoading = false, _ikGisCb = [];
+var _ikGisReady = false, _ikGisLoading = false, _ikGisCb = [], _ikGisInited = false;
 
 /* Muat skrip GIS sekali saja. */
 function ikLoadGis(cb) {
@@ -4576,6 +4576,19 @@ function ikGisErrMsg(err) {
   return 'Gagal masuk dengan Google: ' + ((err && (err.message || err.type)) || 'kesalahan tidak diketahui');
 }
 
+/* Pasang tombol resmi GIS ke holder. */
+function ikMountGisButton(holder) {
+  try {
+    holder.innerHTML = '';
+    google.accounts.id.renderButton(holder, {
+      type: 'standard', theme: 'outline', size: 'large',
+      text: 'signin_with', shape: 'rectangular', logo_alignment: 'left', width: 320
+    });
+  } catch (e) {
+    console.warn('GIS renderButton error:', e);
+  }
+}
+
 /* Render tombol Google resmi (iframe dari GIS). */
 function ikRenderGisButton() {
   var holder = document.getElementById('ik-gsi-holder');
@@ -4603,6 +4616,10 @@ function ikRenderGisButton() {
       }
     }, 5000);
     try {
+      // initialize() hanya boleh sekali; kalau dipanggil berulang GIS
+      // memberi peringatan dan hanya instance terakhir yang dipakai.
+      if (_ikGisInited) { ikMountGisButton(holder); return; }
+      _ikGisInited = true;
       google.accounts.id.initialize({
         client_id: IK_GOOGLE_CLIENT_ID,
         callback: async function (resp) {
@@ -4618,10 +4635,7 @@ function ikRenderGisButton() {
         auto_select: false,
         use_fedcm_for_prompt: true
       });
-      google.accounts.id.renderButton(holder, {
-        type: 'standard', theme: 'outline', size: 'large',
-        text: 'signin_with', shape: 'rectangular', logo_alignment: 'left', width: 320
-      });
+      ikMountGisButton(holder);
     } catch (e) {
       console.warn('GIS init error:', e);
       holder.innerHTML = '<p style="font-size:12.5px;color:var(--danger);text-align:center">' + ikGisErrMsg(e) + '</p>';
