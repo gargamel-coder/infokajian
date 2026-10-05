@@ -89,13 +89,15 @@ if (location.protocol === 'file:') {
 }
 html,body{height:100%;overflow:hidden}
 @supports(height:100dvh){html,body{height:100dvh}}
+/* iOS: 100dvh bisa lebih pendek dari layar terlihat -> pakai --vh dari innerHeight */
+html,body{height:calc(var(--vh,1vh) * 100)}
 body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 button{font-family:var(--font);cursor:pointer;border:none;outline:none;background:none;color:inherit;-webkit-tap-highlight-color:transparent}
 input,textarea,select{font-family:var(--font);outline:none;border:none;background:none}
 img{display:block}
 
 /* APP SHELL */
-#app{max-width:430px;margin:0 auto;height:100vh;height:100dvh;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+#app{max-width:430px;margin:0 auto;height:100vh;height:100dvh;height:calc(var(--vh,1vh) * 100);background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 
 /* SCREENS */
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;position:relative}
@@ -704,16 +706,21 @@ input[type="date"],input[type="time"]{-webkit-appearance:none;-moz-appearance:no
   });
  
   // Selaraskan #app dengan tinggi banner install supaya bottom nav tidak terpotong
-function ikSyncBannerOffset(){
-  var app=document.getElementById('app');
-  var b=document.getElementById('pwa-install-banner');
-  if(!app) return;
-  // Ukur BANNER-nya (position:fixed, tinggi pasti). Spacer tidak bisa dipakai
-  // karena tingginya masih 0 saat transisi CSS baru mulai.
+// Tinggi #app = viewport TERLIHAT (innerHeight) - tinggi banner install.
+// Sengaja pakai innerHeight, bukan 100dvh: di iOS Safari 100dvh lebih pendek
+// dari layar terlihat sehingga nav tampak "menggantung" di atas gap kosong.
+// Spacer (static, sebelum #app) sudah mendorong #app turun sebesar tinggi banner.
+function ikAppHeight(){
+  var b = document.getElementById('pwa-install-banner');
   var h = (b && b.getBoundingClientRect().height > 1) ? Math.round(b.getBoundingClientRect().height) : 0;
-  // Spacer (static, sebelum #app) SUDAH mendorong #app turun sebesar h.
-  // Jadi cukup kurangi tinggi #app; jangan tambah margin-top (nanti dobel).
-  app.style.height = (h > 0) ? ('calc(100dvh - ' + h + 'px)') : '';
+  var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  return { banner: h, app: Math.max(0, vh - h) };
+}
+function ikSyncBannerOffset(){
+  var app = document.getElementById('app');
+  if (!app) return;
+  var m = ikAppHeight();
+  app.style.height = m.app > 0 ? (m.app + 'px') : '';
 }
 window.addEventListener('resize', function(){ try{ ikSyncBannerOffset(); }catch(e){} });
 window.ikSyncBannerOffset = ikSyncBannerOffset;
@@ -4781,20 +4788,19 @@ function toggleReminder() {
 (async function() {
   // Fix mobile viewport height (address bar issue)
   function setVH() {
-    var vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', vh + 'px');
-    var app = document.getElementById('app');
-    try {
-      if (app && !(CSS && CSS.supports && CSS.supports('height', '100dvh'))) {
-        app.style.height = window.innerHeight + 'px';
-      }
-    } catch(e) {
-      if (app) app.style.height = window.innerHeight + 'px';
-    }
+    var h = window.innerHeight || document.documentElement.clientHeight || 0;
+    document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+    // Selalu sinkronkan. Dulu hanya saat 100dvh tidak didukung, sehingga di
+    // iOS Safari #app tetap memakai 100dvh yang lebih pendek -> nav menggantung.
+    try { ikSyncBannerOffset(); } catch(e) {}
   }
   setVH();
   window.addEventListener('resize', setVH);
   window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+  // iOS Safari: address bar berubah memicu visualViewport resize
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function(){ setTimeout(setVH, 50); });
+  }
 
   goScreen('home');
 
