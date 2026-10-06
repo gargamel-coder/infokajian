@@ -5932,7 +5932,48 @@ function ntMenuDelete(){
 }
 
 /* ---------- Toolbar: exec command dasar ---------- */
-function ntFocusBody(){ document.getElementById('nt-body').focus(); }
+/* ---------- Jaga seleksi teks saat tombol toolbar ditekan (HP) ----------
+   BUG: di mobile, menekan tombol toolbar (<div onclick>) memicu
+   mousedown/touchstart lebih dulu -> nt-body kehilangan FOKUS (bukan cuma
+   seleksi tampilan) sebelum event click/ntCmd berjalan. Begitu fokus
+   pindah, window.getSelection() sudah collapsed/kosong, lalu .focus() di
+   ntFocusBody() lama MERESET kursor ke AWAL elemen -- itulah sebabnya
+   format "tidak berfungsi" dan kursor "melompat ke atas".
+   Perbaikan: tangkap & simpan Range di fase mousedown/touchstart (SEBELUM
+   fokus hilang), lalu preventDefault supaya nt-body tidak pernah blur.
+   ntCmd dkk lalu memulihkan Range itu tanpa memanggil focus() yang
+   mereset posisi. */
+var _ntSavedRange = null;
+(function(){
+  var bar = document.querySelector('.nt-bar');
+  if (!bar) return;
+  function tangkap(e){
+    var btn = e.target.closest('.nt-b, .nt-sw');
+    if (!btn) return;
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+      var r = sel.getRangeAt(0);
+      if (document.getElementById('nt-body').contains(r.commonAncestorContainer)) {
+        _ntSavedRange = r.cloneRange();
+      }
+    }
+    // Cegah nt-body kehilangan fokus sama sekali saat toolbar ditekan,
+    // supaya seleksi/kursor TIDAK pernah collapse di tengah proses.
+    if (document.activeElement === document.getElementById('nt-body')) e.preventDefault();
+  }
+  bar.addEventListener('mousedown', tangkap);
+  bar.addEventListener('touchstart', tangkap, {passive:false});
+})();
+function ntFocusBody(){
+  var body = document.getElementById('nt-body');
+  if (document.activeElement !== body) body.focus();
+  if (_ntSavedRange) {
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_ntSavedRange);
+    _ntSavedRange = null;   // sekali pakai -- jangan nyangkut ke aksi toolbar berikutnya
+  }
+}
 function ntSaveSelection(){
   var sel = window.getSelection();
   if (sel && sel.rangeCount) return sel.getRangeAt(0);
