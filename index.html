@@ -5955,7 +5955,7 @@ document.addEventListener('selectionchange', function(){
   var body = document.getElementById('nt-body');
   if (!body) return;
   var sel = window.getSelection();
-  if (sel && sel.rangeCount && !sel.isCollapsed) {
+  if (sel && sel.rangeCount) {
     var r = sel.getRangeAt(0);
     if (body.contains(r.commonAncestorContainer)) {
       _ntSavedRange = r.cloneRange();
@@ -6244,7 +6244,13 @@ function ntSlashHighlight(items){
 }
 
 /* ---------- Tempel Ayat / Hadits ---------- */
+var _ntAyatRange = null;
 function ntOpenAyat(){
+  var body = document.getElementById('nt-body');
+  var sel = window.getSelection();
+  var r = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+  _ntAyatRange = r && body.contains(r.commonAncestorContainer) ? r.cloneRange() :
+    (_ntSavedRange && body.contains(_ntSavedRange.commonAncestorContainer) ? _ntSavedRange.cloneRange() : null);
   document.getElementById('ayat-ref').value = '';
   document.getElementById('ayat-preview').innerHTML = '';
   document.getElementById('ayat-m-ar').value = '';
@@ -6332,8 +6338,16 @@ function ntInsertAyat(){
       + '</div><p><br></p>';
   }
   closeModal('modal-ayat');
-  ntFocusBody();
+  var body = document.getElementById('nt-body');
+  body.focus({preventScroll:true});
+  var range = _ntAyatRange;
+  if (!range || !body.contains(range.commonAncestorContainer)) {
+    range = document.createRange(); range.selectNodeContents(body); range.collapse(false);
+  }
+  ntRestoreSelection(range);
   document.execCommand('insertHTML', false, html);
+  _ntAyatRange = null;
+  _ntSavedRange = ntSaveSelection();
   ntUpdateEmptyState();
   ntScheduleSave();
 }
