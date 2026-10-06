@@ -1609,14 +1609,14 @@ function showBanner() {
       <button id="ayat-tab-manual" class="tab" onclick="ntAyatTab('manual')" style="flex:1;text-align:center;background:var(--pl)">Tulis Manual</button>
     </div>
     <div id="ayat-quran-panel">
-      <div class="field"><label class="lbl">Surat : Ayat (contoh: 2:255 atau 2:1-5)</label><input id="ayat-ref" class="inp" placeholder="2:255" inputmode="numeric"/></div>
+      <div class="field"><label class="lbl">Surat : Ayat (contoh: 2:255 atau 2:1-5)</label><input id="ayat-ref" class="inp" placeholder="2:255" type="text" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="off" onfocus="ntKeepFieldVisible(this)"/></div>
       <button class="btn btn-o" style="margin-bottom:10px" onclick="ntFetchAyat()">Ambil Ayat</button>
       <div id="ayat-preview" style="font-size:13px;color:var(--muted);min-height:20px"></div>
     </div>
     <div id="ayat-manual-panel" style="display:none">
-      <div class="field"><label class="lbl">Teks Arab (opsional)</label><textarea id="ayat-m-ar" class="inp nt-ay-in" style="direction:rtl;font-family:'Amiri','Scheherazade New',serif;font-size:19px" placeholder="..."></textarea></div>
-      <div class="field"><label class="lbl">Terjemahan / Isi</label><textarea id="ayat-m-tr" class="inp nt-ay-in" placeholder="Terjemahan atau isi hadits"></textarea></div>
-      <div class="field"><label class="lbl">Sumber</label><input id="ayat-m-rf" class="inp" placeholder="Contoh: QS. Al-Baqarah 2:255 / HR. Bukhari no. 1"/></div>
+      <div class="field"><label class="lbl">Teks Arab (opsional)</label><textarea id="ayat-m-ar" class="inp nt-ay-in" style="direction:rtl;font-family:'Amiri','Scheherazade New',serif;font-size:19px" placeholder="..." onfocus="ntKeepFieldVisible(this)"></textarea></div>
+      <div class="field"><label class="lbl">Terjemahan / Isi</label><textarea id="ayat-m-tr" class="inp nt-ay-in" placeholder="Terjemahan atau isi hadits" onfocus="ntKeepFieldVisible(this)"></textarea></div>
+      <div class="field"><label class="lbl">Sumber</label><input id="ayat-m-rf" class="inp" placeholder="Contoh: QS. Al-Baqarah 2:255 / HR. Bukhari no. 1" onfocus="ntKeepFieldVisible(this)"/></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:6px">
       <button class="btn btn-o" onclick="closeModal('modal-ayat')">Batal</button>
@@ -6279,6 +6279,50 @@ if (window.visualViewport) {
 document.addEventListener('selectionchange', function(){
   if (screenHistory[screenHistory.length-1] === 'note') ntSyncKeyboard();
 });
+
+/* ---------- Keyboard HP untuk modal/sheet (mis. "Tempel Ayat/Hadits") ----------
+   Modal pakai .overlay{align-items:flex-end} supaya sheet nempel di DASAR
+   LAYOUT viewport. Tapi saat keyboard muncul, iOS/Android hanya mengecilkan
+   visualViewport (bukan layout viewport) -- sheet tetap di posisi lama dan
+   keyboard menutupinya dari bawah. Perbaikan: begitu sebuah input/textarea
+   di dalam .sheet fokus, dorong sheet itu naik sebesar tinggi keyboard
+   (selisih innerHeight vs visualViewport.height), lalu scroll field yang
+   fokus ke tengah area yang masih terlihat. */
+var _ikKbdSheetEl = null;
+function ntKeepFieldVisible(el){
+  _ikKbdSheetEl = el ? el.closest('.sheet') : null;
+  ikAdjustSheetForKeyboard();
+  setTimeout(ikAdjustSheetForKeyboard, 300); // iOS: ukuran keyboard final telat sedikit
+}
+function ikAdjustSheetForKeyboard(){
+  var sheet = _ikKbdSheetEl;
+  if (!sheet || !document.body.contains(sheet)) { _ikKbdSheetEl = null; return; }
+  var vv = window.visualViewport;
+  var kbdH = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+  // Kalau keyboard sudah tertutup (kbdH kecil) DAN field yang memicu geser ini
+  // sudah tidak fokus lagi, lepas sheet sepenuhnya -- jangan menunggu event lain.
+  var active = document.activeElement;
+  var masihFokusDiDalam = active && sheet.contains(active) && active !== document.body;
+  if (kbdH > 60 && masihFokusDiDalam) {
+    sheet.style.transform = 'translateY(-' + kbdH + 'px)';
+    sheet.style.transition = 'transform .15s ease';
+    sheet.style.maxHeight = 'calc(88dvh - ' + kbdH + 'px)';
+    if (typeof active.scrollIntoView === 'function') active.scrollIntoView({block:'nearest'});
+  } else {
+    sheet.style.transform = '';
+    sheet.style.maxHeight = '';
+    if (!masihFokusDiDalam) _ikKbdSheetEl = null;
+  }
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', ikAdjustSheetForKeyboard);
+}
+document.addEventListener('focusout', function(e){
+  // Field kehilangan fokus (tutup keyboard / pindah field). Cek ulang sebentar
+  // kemudian supaya activeElement baru (kalau pindah ke field lain) sudah settle.
+  if (!_ikKbdSheetEl) return;
+  setTimeout(ikAdjustSheetForKeyboard, 60);
+}, true);
 
 /* ---------- Checklist: toggle klik ---------- */
 document.addEventListener('click', function(e){
