@@ -1884,9 +1884,9 @@ async function fsLoadAll() {
       var seen = {};
       return arr.filter(function(x) { if (seen[x.id]) return false; seen[x.id] = true; return true; });
     }
-    if (speakers.length) DB.speakers = dedup(speakers);
-    if (mosques.length)  DB.mosques  = dedup(mosques);
-    if (kajian.length)   DB.kajian   = dedup(kajian);
+    DB.speakers = dedup(speakers);
+    DB.mosques = dedup(mosques);
+    DB.kajian = dedup(kajian);
     if (users.length) {
       // Merge Firestore users with any local-only users (e.g. seed), dedup by id
       var merged = dedup(users.concat(DB.users.filter(function(lu){
@@ -2015,31 +2015,10 @@ const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.get
 const T = today();
 
 const DB = {
-  speakers: [
-    {id:'s1',full_name:'Ustadz Abdul Somad',normalized_name:'abdul somad',verified:true,created_by:'u3'},
-    {id:'s2',full_name:'Ustadz Adi Hidayat',normalized_name:'adi hidayat',verified:true,created_by:'u3'},
-    {id:'s3',full_name:'Ustadz Felix Siauw',normalized_name:'felix siauw',verified:true,created_by:'u3'},
-    {id:'s4',full_name:'Ustadz Khalid Basalamah',normalized_name:'khalid basalamah',verified:true,created_by:'u3'},
-    {id:'s5',full_name:'Ustadz Hanan Attaki',normalized_name:'hanan attaki',verified:true,created_by:'u3'},
-  ],
-  mosques: [
-    {id:'m1',name:'Masjid Istiqlal',address:'Jl. Taman Wijaya Kusuma, Gambir, Jakarta Pusat',city:'Jakarta Pusat',district:'Gambir',lat:-6.1701,lng:106.831,verified:true},
-    {id:'m2',name:'Masjid Al-Azhar',address:'Jl. Sisingamangaraja, Kebayoran Baru, Jakarta Selatan',city:'Jakarta Selatan',district:'Kebayoran Baru',lat:-6.2411,lng:106.8082,verified:true},
-    {id:'m3',name:'Masjid Agung Sunda Kelapa',address:'Jl. Taman Sunda Kelapa, Menteng, Jakarta Pusat',city:'Jakarta Pusat',district:'Menteng',lat:-6.1965,lng:106.8396,verified:true},
-    {id:'m4',name:'Masjid Raya Bandung',address:'Jl. Dalem Kaum, Alun-Alun, Bandung',city:'Bandung',district:'Alun-Alun',lat:-6.921,lng:107.6053,verified:true},
-    {id:'m5',name:'Masjid Gedhe Kauman',address:'Jl. Kauman, Kraton, Yogyakarta',city:'Yogyakarta',district:'Kraton',lat:-7.8014,lng:110.3645,verified:true},
-  ],
-  kajian: [
-    {id:'k1',title:'Tafsir Juz Amma untuk Pemula',topic:'Tafsir',speaker_id:'s2',mosque_id:'m1',date:T,time:'08:00',status:'approved',description:'Kajian rutin membahas tafsir juz amma dengan bahasa yang mudah dipahami semua kalangan.',submitted_by:'u2'},
-    {id:'k2',title:'Fiqih Muamalah Modern',topic:'Fiqih',speaker_id:'s1',mosque_id:'m2',date:addDays(T,1),time:'19:30',status:'approved',description:'Membahas hukum-hukum transaksi keuangan modern dalam perspektif Islam.',submitted_by:'u2'},
-    {id:'k3',title:'Sirah Nabawiyah: Hikmah Hijrah',topic:'Sirah',speaker_id:'s5',mosque_id:'m3',date:addDays(T,1),time:'20:00',status:'approved',description:'Mengupas perjalanan hijrah Rasulullah SAW dan hikmah yang bisa kita ambil.',submitted_by:'u2'},
-    {id:'k4',title:'Akidah Islam: Mengenal Allah SWT',topic:'Akidah',speaker_id:'s4',mosque_id:'m4',date:addDays(T,7),time:'09:00',status:'approved',description:'Penjelasan mendalam mengenai tauhid dan mengenal Allah melalui asmaul husna.',submitted_by:'u2'},
-    {id:'k5',title:'Tazkiyatun Nafs: Menyucikan Jiwa',topic:'Akhlak',speaker_id:'s3',mosque_id:'m5',date:addDays(T,7),time:'17:30',status:'postponed',description:'Kajian tentang penyucian jiwa dan akhlak mulia dalam kehidupan sehari-hari.',submitted_by:'u2'},
-    {id:'k6',title:'Hadits Arbain: Niat & Amal',topic:'Hadits',speaker_id:'s2',mosque_id:'m1',date:T,time:'13:00',status:'approved',description:'Membahas hadits pilihan dari Arbain Nawawi tentang niat dan amalan shalih.',submitted_by:'u2'},
-    {id:'k7',title:'Kajian Muslimah: Wanita Shalihah',topic:'Muslimah',speaker_id:'s1',mosque_id:'m2',date:addDays(T,14),time:'10:00',status:'pending',description:'Kajian khusus muslimah membahas peran dan keutamaan wanita shalihah.',submitted_by:'u2'},
-    {id:'k8',title:'Pengantar Ilmu Tajwid',topic:'Tilawah',speaker_id:'s4',mosque_id:'m3',date:addDays(T,3),time:'08:30',status:'approved',description:'Belajar dasar-dasar tajwid untuk membaca Al-Quran dengan benar.',submitted_by:'u2'},
-    {id:'k9',title:'Kajian Keluarga: Parenting Islami',topic:'Keluarga',speaker_id:'s5',mosque_id:'m4',date:addDays(T,5),time:'10:00',status:'cancelled',description:'Membahas pola asuh anak sesuai nilai-nilai Islam.',submitted_by:'u2'},
-  ],
+  // Katalog hanya diisi data Firestore, tidak pernah data contoh.
+  speakers: [],
+  mosques: [],
+  kajian: [],
   users: [
     {id:'u1',email:'user@demo.com',password:'demo123',name:'Ahmad Fauzi',role:'user',created_at:'2024-01-15'},
     {id:'u2',email:'contributor@demo.com',password:'demo123',name:'Siti Aisyah',role:'contributor',created_at:'2024-01-10'},
