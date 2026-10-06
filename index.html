@@ -3741,9 +3741,11 @@ function ikPosterSVGString(k, fontCss){
 
 /* SVG -> PNG Blob */
 function ikPosterBlob(k, cb){
-  ikLoadFontCSS(function(fontCss){
+  // Font ditanam dari file lokal (base64, lihat ikFontCSSv2) — TIDAK fetch
+  // Google Fonts lagi. Sebelumnya fetch bisa gagal/lambat di jaringan lemah
+  // dan diam-diam jatuh ke font sistem sehingga posisi teks poster meleset.
   var svg, url;
-  try { svg = ikPosterSVGString(k, fontCss); } catch(e){ cb(null); return; }
+  try { svg = ikPosterSVGString(k, ikFontCSSv2()); } catch(e){ cb(null); return; }
   url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   var img = new Image();
   img.onload = function(){
@@ -3760,7 +3762,6 @@ function ikPosterBlob(k, cb){
   };
   img.onerror = function(){ cb(null); };
   img.src = url;
-  });
 }
 
 function ikPosterFilename(k){
@@ -3783,7 +3784,7 @@ function ikUnduhPoster(){
   var id = state.currentKajianId; if(!id) return;
   var k = DB.kajian.find(function(x){ return x.id===id; }); if(!k) return;
   showToast('Membuat poster…', 'i');
-  ikPosterBlobV2(k, function(blob){
+  ikPosterBlob(k, function(blob){
     if (!blob){ showToast('Gagal membuat poster. Coba lagi.', 'e'); return; }
     ikDownloadBlob(blob, ikPosterFilename(k));
     showToast('Poster diunduh ✅', 's');
@@ -3795,7 +3796,7 @@ function ikBagikanPoster(){
   var k = DB.kajian.find(function(x){ return x.id===id; }); if(!k) return;
   var shareUrl = 'https://infokajian.app?kajian=' + encodeURIComponent(id);
   showToast('Membuat poster…', 'i');
-  ikPosterBlobV2(k, function(blob){
+  ikPosterBlob(k, function(blob){
     if (blob && navigator.canShare){
       try {
         var file = new File([blob], ikPosterFilename(k), {type:'image/png'});
