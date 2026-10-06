@@ -5793,6 +5793,8 @@ function ntOpenEditorFor(note){
   ntRenderTags(note.tags || []);
   ntUpdatePinBtn(note.pinned);
   ntSetStatus('ok');
+  _ntSavedRange = null;
+  ntUpdateToolbarState();
   setTimeout(function(){ document.getElementById('nt-scroll').scrollTop = 0; }, 30);
 }
 function ntCloseEditor(){
@@ -5932,47 +5934,77 @@ function ntMenuDelete(){
 }
 
 /* ---------- Toolbar: exec command dasar ---------- */
-/* ---------- Jaga seleksi teks saat tombol toolbar ditekan (HP) ----------
-   BUG: di mobile, menekan tombol toolbar (<div onclick>) memicu
-   mousedown/touchstart lebih dulu -> nt-body kehilangan FOKUS (bukan cuma
-   seleksi tampilan) sebelum event click/ntCmd berjalan. Begitu fokus
-   pindah, window.getSelection() sudah collapsed/kosong, lalu .focus() di
-   ntFocusBody() lama MERESET kursor ke AWAL elemen -- itulah sebabnya
-   format "tidak berfungsi" dan kursor "melompat ke atas".
-   Perbaikan: tangkap & simpan Range di fase mousedown/touchstart (SEBELUM
-   fokus hilang), lalu preventDefault supaya nt-body tidak pernah blur.
-   ntCmd dkk lalu memulihkan Range itu tanpa memanggil focus() yang
-   mereset posisi. */
+/* ---------- Jaga seleksi teks di HP (iOS/Android) ----------
+   BUG: di mobile (terutama iOS Safari dengan native selection handle hijau),
+   begitu jari menyentuh toolbar, window.getSelection() SUDAH collapsed
+   sebelum event apa pun pada tombol kita berjalan -- menebak di
+   mousedown/touchstart tombol itu sendiri TERLALU TELAT.
+   Perbaikan: dengarkan 'selectionchange' TERUS-MENERUS di document (bukan
+   cuma saat tombol ditekan) dan simpan setiap seleksi VALID (tidak kosong,
+   di dalam nt-body) ke _ntSavedRange begitu terjadi. Jadi kapan pun user
+   menyentuh toolbar, kita sudah punya salinan seleksi TERAKHIR yang valid,
+   seberapa pun cepat iOS menghapusnya. */
 var _ntSavedRange = null;
-(function(){
-  var bar = document.querySelector('.nt-bar');
-  if (!bar) return;
-  function tangkap(e){
-    var btn = e.target.closest('.nt-b, .nt-sw');
-    if (!btn) return;
-    var sel = window.getSelection();
-    if (sel && sel.rangeCount && !sel.isCollapsed) {
-      var r = sel.getRangeAt(0);
-      if (document.getElementById('nt-body').contains(r.commonAncestorContainer)) {
-        _ntSavedRange = r.cloneRange();
-      }
+document.addEventListener('selectionchange', function(){
+  var body = document.getElementById('nt-body');
+  if (!body) return;
+  var sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed) {
+    var r = sel.getRangeAt(0);
+    if (body.contains(r.commonAncestorContainer)) {
+      _ntSavedRange = r.cloneRange();
     }
-    // Cegah nt-body kehilangan fokus sama sekali saat toolbar ditekan,
-    // supaya seleksi/kursor TIDAK pernah collapse di tengah proses.
-    if (document.activeElement === document.getElementById('nt-body')) e.preventDefault();
   }
-  bar.addEventListener('mousedown', tangkap);
-  bar.addEventListener('touchstart', tangkap, {passive:false});
-})();
+  // Update highlight status tombol (B/I/U/S menyala sesuai posisi kursor).
+  if (screenHistory[screenHistory.length-1] === 'note') ntUpdateToolbarState();
+});
 function ntFocusBody(){
   var body = document.getElementById('nt-body');
   if (document.activeElement !== body) body.focus();
   if (_ntSavedRange) {
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(_ntSavedRange);
-    _ntSavedRange = null;   // sekali pakai -- jangan nyangkut ke aksi toolbar berikutnya
+    try {
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(_ntSavedRange);
+    } catch(e) { /* range sudah tidak valid (DOM berubah) -- lanjut tanpa restore */ }
   }
+}
+/* ---------- Indikator format aktif (nyala saat kursor di teks berformat) ---------- */
+var NT_STATE_BTNS = [
+  {cmd:'bold', sel:"[onclick=\"ntCmd('bold')\"]"},
+  {cmd:'italic', sel:"[onclick=\"ntCmd('italic')\"]"},
+  {cmd:'underline', sel:"[onclick=\"ntCmd('underline')\"]"},
+  {cmd:'strikeThrough', sel:"[onclick=\"ntCmd('strikeThrough')\"]"},
+];
+function ntUpdateToolbarState(){
+  NT_STATE_BTNS.forEach(function(b){
+    var el = document.querySelector('.nt-bar-row '+b.sel);
+    if (!el) return;
+    var on = false;
+    try { on = document.queryCommandState(b.cmd); } catch(e){}
+    el.classList.toggle('on', on);
+  });
+  // Heading & blockquote: cek elemen induk dari node kursor.
+  var sel = window.getSelection();
+  var node = sel && sel.anchorNode;
+  var h1=false, h2=false, quote=false;
+  if (node) {
+    var el2 = node.nodeType===3 ? node.parentElement : node;
+    var body = document.getElementById('nt-body');
+    while (el2 && el2 !== body) {
+      var tag = el2.tagName;
+      if (tag==='H1') h1=true;
+      if (tag==='H2') h2=true;
+      if (tag==='BLOCKQUOTE') quote=true;
+      el2 = el2.parentElement;
+    }
+  }
+  var h1Btn = document.querySelector('.nt-bar-row [onclick="ntHeading(1)"]');
+  var h2Btn = document.querySelector('.nt-bar-row [onclick="ntHeading(2)"]');
+  var qBtn  = document.querySelector('.nt-bar-row [onclick="ntInsertQuote()"]');
+  if (h1Btn) h1Btn.classList.toggle('on', h1);
+  if (h2Btn) h2Btn.classList.toggle('on', h2);
+  if (qBtn)  qBtn.classList.toggle('on', quote);
 }
 function ntSaveSelection(){
   var sel = window.getSelection();
@@ -5990,11 +6022,13 @@ function ntCmd(cmd, val){
   document.execCommand(cmd, false, val || null);
   ntUpdateEmptyState();
   ntScheduleSave();
+  ntUpdateToolbarState();
 }
 function ntHeading(level){
   ntFocusBody();
   document.execCommand('formatBlock', false, 'H'+level);
   ntScheduleSave();
+  ntUpdateToolbarState();
 }
 function ntInsertList(kind){
   ntFocusBody();
