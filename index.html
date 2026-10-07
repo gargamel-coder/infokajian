@@ -1050,7 +1050,7 @@ function showBanner() {
             <span class="ik-count-h" id="ik-count-h">Menuju Ashar</span>
           </div>
           <div class="ik-count-n" id="ik-count-n">--:--:--</div>
-          <div class="ik-count-sub"><b id="ik-azan">Azan --:--</b><span id="ik-note"> · Memuat waktu salat...</span></div>
+          <div class="ik-count-sub"><b id="ik-azan">Azan --:--</b><span id="ik-note"></span></div>
           <div class="ik-bar"><div class="ik-bar-fill" id="ik-bar-fill" style="width:0%"></div><div class="ik-bar-dot" id="ik-bar-dot" style="left:0%"></div></div>
         </div>
         <!-- Last Read -->
@@ -2617,7 +2617,7 @@ function ikTick(){
 
   const g=function(id){ return document.getElementById(id); };
   const hEl=g('ik-count-h'), nEl=g('ik-count-n'),
-        azEl=g('ik-azan'), ntEl=g('ik-note'), fEl=g('ik-bar-fill'), bdEl=g('ik-bar-dot');
+        azEl=g('ik-azan'), fEl=g('ik-bar-fill'), bdEl=g('ik-bar-dot');
 
   if(hEl) hEl.textContent='Menuju '+nx.name;
   if(nEl){
@@ -2625,11 +2625,7 @@ function ikTick(){
     nEl.textContent = ik2(hh)+':'+ik2(mm)+':'+ik2(ss);
   }
 
-  // salat terakhir yang sudah masuk
-  let lastIdx=-1;
-  IK_PRAY.forEach(function(n,i){ const k=IK_NAMES.indexOf(n); if(ikMin(IK_TIMES[k])<=nm) lastIdx=i; });
   if(azEl) azEl.textContent='Azan '+ikFmt(nextMin);
-  if(ntEl) ntEl.textContent = (lastIdx>=0) ? (' · Salat '+IK_PRAY[lastIdx]+' boleh ditunaikan') : ' · Menunggu waktu Subuh';
 
   // progress bar
   const prevIdx=(nextIdx-1+IK_TIMES.length)%IK_TIMES.length;
