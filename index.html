@@ -1597,6 +1597,7 @@ function showBanner() {
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div class="menu-list">
+      <button class="menu-item" onclick="ntMenuClearFormat()"><span class="menu-label">Hapus format pada teks tersorot</span></button>
       <button class="menu-item" onclick="ntMenuShare()"><span class="menu-label">Bagikan catatan</span></button>
       <button class="menu-item" onclick="ntMenuCopy()"><span class="menu-label">Salin teks</span></button>
       <button class="menu-item" onclick="ntMenuExport()"><span class="menu-label">Unduh sebagai .md (Markdown)</span></button>
@@ -5812,6 +5813,7 @@ function ntOpenEditorFor(note){
   ntUpdatePinBtn(note.pinned);
   ntSetStatus('ok');
   _ntSavedRange = null;
+  _ntWrapMode = null;   // mode stabilo/warna tidak boleh terbawa ke catatan lain
   ntUpdateToolbarState();
   setTimeout(function(){ document.getElementById('nt-scroll').scrollTop = 0; }, 30);
 }
@@ -5922,6 +5924,16 @@ function ntOpenMenu(){
   openModal('modal-note-menu');
 }
 function ntMenuExport(){ closeModal('modal-note-menu'); ntExportNote(); }
+function ntMenuClearFormat(){
+  closeModal('modal-note-menu');
+  // Sorotan teks di editor tetap tersimpan di _ntSavedRange walaupun fokus
+  // berpindah ke sheet menu, jadi pulihkan dulu sebelum menghapus format.
+  var body = document.getElementById('nt-body');
+  body.focus({preventScroll:true});
+  if (_ntSavedRange && body.contains(_ntSavedRange.commonAncestorContainer)) ntRestoreSelection(_ntSavedRange);
+  ntClearFormatSelection();
+  ntKeepCaretVisible();
+}
 function ntMenuCopy(){
   closeModal('modal-note-menu');
   var note = ntCurrentNote(); if (!note) return;
@@ -6042,14 +6054,15 @@ function ntUpdateToolbarState(){
   if (h1Btn) h1Btn.classList.toggle('on', h1);
   if (h2Btn) h2Btn.classList.toggle('on', h2);
   if (qBtn)  qBtn.classList.toggle('on', quote);
-  // Stabilo & warna teks: tombolnya menyala saat kursor berada di teks
-  // berstabilo/berwarna, supaya jelas format apa yang sedang aktif dan
-  // tap ulang akan mematikannya.
+  // Stabilo & warna teks: tombol menyala bila MODE-nya sedang aktif
+  // (teks berikutnya akan ikut berwarna) ATAU kursor berada di teks berwarna.
   var wrap = ntActiveWrapEl();
   var hlBtn = document.querySelector('.nt-bar-row [onclick="ntTogglePalette(\'highlight\')"]');
   var clBtn = document.querySelector('.nt-bar-row [onclick="ntTogglePalette(\'color\')"]');
-  if (hlBtn) hlBtn.classList.toggle('on', !!(wrap && wrap.tagName === 'MARK'));
-  if (clBtn) clBtn.classList.toggle('on', !!(wrap && wrap.tagName === 'SPAN'));
+  var modeHl = !!(_ntWrapMode && _ntWrapMode.jenis === 'hl');
+  var modeCl = !!(_ntWrapMode && _ntWrapMode.jenis === 'txt');
+  if (hlBtn) hlBtn.classList.toggle('on', modeHl || !!(wrap && wrap.tag === 'mark'));
+  if (clBtn) clBtn.classList.toggle('on', modeCl || !!(wrap && wrap.tag === 'span'));
 }
 function ntSaveSelection(){
   var sel = window.getSelection();
@@ -6064,26 +6077,22 @@ function ntRestoreSelection(range){
 }
 function ntCmd(cmd, val){
   ntFocusBody();
-  // KLIK KEDUA = MATIKAN. execCommand() sebenarnya sudah toggle, TAPI tidak
-  // andal saat seleksi hanya berupa KURSOR (collapsed) di dalam teks yang
-  // sudah berformat: di WebKit/Blink kadang tidak melepas formatnya, jadi
-  // tombol garis bawah/coret/tebal terasa "tidak bisa dimatikan" (bug yang
-  // dilaporkan). Karena itu saat kursor berada DI DALAM teks yang sudah
-  // berformat, kita lepas formatnya secara eksplisit.
-  var sedangAktif = false;
-  try { sedangAktif = document.queryCommandState(cmd); } catch(e) {}
-  if (sedangAktif) {
-    ntClearInlineFormat(cmd);
-  } else {
-    document.execCommand(cmd, false, val || null);
-  }
+  // Tombol = MODE MENULIS, bukan "hapus format".
+  //   - Kalau mode belum aktif  -> aktifkan (teks yang diketik berikutnya ikut
+  //     berformat; kalau ada teks tersorot, sorotan itu langsung diformat).
+  //   - Kalau mode sudah aktif  -> matikan mode saja. Teks yang SUDAH ditulis
+  //     dengan format itu DIBIARKAN (tidak diubah sama sekali).
+  // execCommand() sendiri bersifat toggle dan saat dimatikan ia hanya mengubah
+  // "state" pengetikan berikutnya, jadi cukup diteruskan.
+  document.execCommand(cmd, false, val || null);
   ntUpdateEmptyState();
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
 }
-/* Lepas format inline (bold/italic/underline/coret) pada seleksi ATAU pada
-   kata tempat kursor berada. Dipakai saat tombol format ditekan kedua kali. */
+/* Lepas format inline pada teks yang DIPILIH pengguna secara eksplisit.
+   Sengaja TIDAK dipakai oleh ntCmd: klik tombol format tidak boleh mengubah
+   teks lama. Disiapkan untuk aksi eksplisit seperti "Hapus format" di menu. */
 var NT_INLINE_TAGS = {bold:['B','STRONG'], italic:['I','EM'], underline:['U'], strikeThrough:['S','STRIKE','DEL']};
 function ntClearInlineFormat(cmd){
   var tags = NT_INLINE_TAGS[cmd];
@@ -6123,10 +6132,11 @@ function ntClearInlineFormat(cmd){
 }
 function ntHeading(level){
   ntFocusBody();
-  // Klik kedua pada H1/H2 yang sama = kembalikan ke paragraf biasa (toggle off).
-  var sedangH = false;
-  try { sedangH = ntBlockIs('H'+level); } catch(e) {}
-  document.execCommand('formatBlock', false, sedangH ? 'P' : 'H'+level);
+  // Konsisten dengan tombol format lain: klik hanya memilih gaya blok untuk
+  // baris tempat kursor berada. Heading yang sudah jadi pada baris LAIN tidak
+  // diubah. Untuk mengembalikan sebuah heading ke paragraf, gunakan menu
+  // "Hapus format" (atau pilih blok kosong lalu pilih Paragraf).
+  document.execCommand('formatBlock', false, 'H'+level);
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
@@ -6140,10 +6150,42 @@ function ntBlockIs(tag){
   while (el && el !== body) { if (el.tagName === tag) return true; el = el.parentElement; }
   return false;
 }
+/* Hapus format pada teks yang DISOROT pengguna (aksi eksplisit dari menu).
+   Berbeda dengan tombol toolbar: ini memang bertujuan mengubah teks lama. */
+function ntClearFormatSelection(){
+  var sel = window.getSelection();
+  var body = document.getElementById('nt-body');
+  if (!sel || !sel.rangeCount || sel.isCollapsed) {
+    showToast('Sorot teks yang ingin dihapus formatnya dulu','i');
+    return;
+  }
+  var range = sel.getRangeAt(0);
+  if (!body.contains(range.commonAncestorContainer)) return;
+  var semuaTag = ['B','STRONG','I','EM','U','S','STRIKE','DEL','MARK','CODE'];
+  var scope = range.cloneRange();
+  var kumpulan = [];
+  var walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
+  var n;
+  while ((n = walker.nextNode())) {
+    var tagOk = semuaTag.indexOf(n.tagName) > -1;
+    var warnaOk = n.tagName === 'SPAN' && /(^|\s)c-[a-z](\s|$)/.test(n.className);
+    if ((tagOk || warnaOk) && scope.intersectsNode(n)) kumpulan.push(n);
+  }
+  kumpulan.forEach(function(el){
+    if (!el.parentNode) return;
+    var parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  });
+  try { body.normalize(); } catch(e) {}
+  ntUpdateToolbarState();
+  ntScheduleSave();
+  showToast('Format dihapus', 's');
+}
 function ntInsertList(kind){
   ntFocusBody();
-  // Klik kedua pada jenis daftar yang sama = lepas daftar (toggle off).
-  // execCommand() untuk list sudah bersifat toggle, jadi cukup diteruskan.
+  // Sama seperti tombol format lain: ini memilih gaya blok untuk baris tempat
+  // kursor berada, bukan mengubah daftar yang sudah jadi di baris lain.
   document.execCommand(kind==='ol' ? 'insertOrderedList' : 'insertUnorderedList', false, null);
   ntScheduleSave();
   ntUpdateToolbarState();
@@ -6222,8 +6264,54 @@ function ntWrapSelection(tag, cls){
   sel.addRange(r2);
   return el;
 }
-/* Elemen pembungkus (mark/span berwarna) yang sedang berisi kursor.
-   Dipakai untuk mendeteksi format aktif sehingga tap ulang bisa MEMATIKAN. */
+/* ---------- Stabilo & warna teks = MODE MENULIS (pakai execCommand) ----------
+   Disimpan sebagai mode: pilih warna -> warna itu dipakai untuk ketikan
+   berikutnya; pilih "Hapus" atau warna yang sama -> mode mati, teks yang
+   sudah ada DIBIARKAN.
+
+   PENTING: memakai execCommand('hiliteColor'/'foreColor'), BUKAN membungkus
+   <mark>/<span> manual. execCommand sudah menangani penyisipan teks dengan
+   benar (menguji manual-<mark> gagal karena insertText selalu menaruh teks
+   baru di dalam pembungkus lama).
+   - Melepas stabilo  : hiliteColor 'inherit'  (terbukti bekerja).
+   - Melepas warna    : foreColor '#000000' (warna teks normal).
+   Warna highlight disimpan sebagai hex agar hiliteColor menerimanya. */
+var NT_HL_HEX = {'h-y':'#FFF1A6','h-g':'#C8F0C8','h-b':'#BFE3FF','h-p':'#FFD3E4','h-o':'#FFD9B0','h-v':'#E1D4FF'};
+var NT_TXT_HEX = {'c-r':'#C62828','c-b':'#1565C0','c-g':'#2E7D32','c-o':'#D9730D','c-v':'#6A3FB5','c-m':'#7A8F83'};
+var _ntWrapMode = null;   // {jenis:'hl'|'txt', cls:'h-y'|'c-r'|...}
+function ntApplyHighlight(cls){
+  document.getElementById('nt-pal-highlight').classList.remove('open');
+  ntFocusBody();
+  var sama = !!(_ntWrapMode && _ntWrapMode.jenis === 'hl' && _ntWrapMode.cls === cls);
+  ntSetWrapMode((cls && !sama) ? {jenis:'hl', cls:cls} : null, 'Stabilo');
+  ntKeepCaretVisible(); ntScheduleSave();
+}
+function ntApplyTextColor(cls){
+  document.getElementById('nt-pal-color').classList.remove('open');
+  ntFocusBody();
+  var sama = !!(_ntWrapMode && _ntWrapMode.jenis === 'txt' && _ntWrapMode.cls === cls);
+  ntSetWrapMode((cls && !sama) ? {jenis:'txt', cls:cls} : null, 'Warna teks');
+  ntKeepCaretVisible(); ntScheduleSave();
+}
+function ntSetWrapMode(mode, jenis){
+  _ntWrapMode = mode;
+  document.execCommand(mode ? (mode.jenis === 'hl' ? 'hiliteColor' : 'foreColor') : null, false,
+    mode ? (mode.jenis === 'hl' ? NT_HL_HEX[mode.cls] : NT_TXT_HEX[mode.cls])
+         : null);
+  // Saat mode dimatikan: lepas format untuk ketikan berikutnya, tanpa mengubah
+  // teks yang sudah ada (execCommand pada seleksi kosong hanya mengubah state).
+  if (!mode) {
+    if (jenis === 'Warna teks') document.execCommand('foreColor', false, '#000000');
+    else document.execCommand('hiliteColor', false, 'inherit');
+    showToast(jenis + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
+  } else {
+    showToast(jenis + ' aktif — teks berikutnya ikut terwarnai', 'i');
+  }
+  ntUpdateToolbarState();
+}
+/* ---------- Slash menu "/" ---------- */
+/* Indikator tombol stabilo/warna: menyala bila MODE-nya aktif, atau kursor
+   berada di teks yang sudah berstabilo/berwarna. */
 function ntActiveWrapEl(){
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount) return null;
@@ -6231,49 +6319,13 @@ function ntActiveWrapEl(){
   var el = node && node.nodeType === 3 ? node.parentElement : node;
   var body = document.getElementById('nt-body');
   while (el && el !== body) {
-    if (el.tagName === 'MARK' || (el.tagName === 'SPAN' && /(^|\s)c-[a-z](\s|$)/.test(el.className))) return el;
+    if (el.tagName === 'MARK') return {tag:'mark', el:el};
+    if (el.tagName === 'SPAN' && /(^|\s)c-[a-z](\s|$)/.test(el.className)) return {tag:'span', el:el};
+    if (el.tagName === 'SPAN' && /background-color/.test(el.getAttribute('style')||'')) return {tag:'mark', el:el};
+    if (el.tagName === 'FONT') return {tag:'span', el:el};
     el = el.parentElement;
   }
   return null;
-}
-function ntClearWrap(){
-  var el = ntActiveWrapEl();
-  if (!el || !el.parentNode) return;
-  var parent = el.parentNode;
-  while (el.firstChild) parent.insertBefore(el.firstChild, el);
-  parent.removeChild(el);
-}
-/* Sisipkan stabilo/warna: kalau teks yang dipilih/kursor SUDAH punya format
-   yang sama, maka matikan (toggle off). Kalau tidak, terapkan. */
-function ntToggleWrap(tag, cls, jenis){
-  var aktif = ntActiveWrapEl();
-  if (aktif) {
-    var samaKelas = aktif.className === (cls || '') || (cls && aktif.classList.contains(cls));
-    var samaJenis = (tag === 'mark' && aktif.tagName === 'MARK') || (tag === 'span' && aktif.tagName === 'SPAN');
-    // Tap pada warna/format yang sama ATAU tap "Hapus" => matikan.
-    if (!cls || (samaKelas && samaJenis)) {
-      ntClearWrap();
-      showToast(jenis + ' dimatikan', 'i');
-      return;
-    }
-  }
-  ntWrapSelection(tag, cls);
-}
-function ntApplyHighlight(cls){
-  document.getElementById('nt-pal-highlight').classList.remove('open');
-  ntFocusBody();
-  ntToggleWrap('mark', cls, 'Stabilo');
-  ntUpdateToolbarState();
-  ntKeepCaretVisible();
-  ntScheduleSave();
-}
-function ntApplyTextColor(cls){
-  document.getElementById('nt-pal-color').classList.remove('open');
-  ntFocusBody();
-  ntToggleWrap('span', cls, 'Warna teks');
-  ntUpdateToolbarState();
-  ntKeepCaretVisible();
-  ntScheduleSave();
 }
 
 /* ---------- Slash menu "/" ---------- */
@@ -6354,6 +6406,8 @@ function ntRemoveSlashTrigger(){
 function ntHandleBodyInput(e){
   ntUpdateEmptyState();
   ntScheduleSave();
+  // Mode stabilo/warna ditangani sepenuhnya oleh execCommand (hiliteColor/
+  // foreColor), jadi tidak perlu memodifikasi DOM di sini.
   // Deteksi '/' di awal baris / setelah spasi untuk memicu slash menu.
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount || !sel.isCollapsed) { ntHideSlash(); return; }
