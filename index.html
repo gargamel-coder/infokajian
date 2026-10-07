@@ -6029,9 +6029,13 @@ function ntUpdateToolbarState(){
   NT_STATE_BTNS.forEach(function(b){
     var el = document.querySelector('.nt-bar-row '+b.sel);
     if (!el) return;
-    var on = false;
-    try { on = document.queryCommandState(b.cmd); } catch(e){}
-    el.classList.toggle('on', on);
+    // Indikator mengikuti MODE yang kita lacak (bukan queryCommandState yang
+    // tidak konsisten saat seleksi kosong), TAPI tetap menyala kalau kursor
+    // berada di teks yang sudah berformat itu.
+    var onMode = !!_ntInlineMode[b.cmd];
+    var diTeksBerformat = false;
+    try { diTeksBerformat = document.queryCommandState(b.cmd); } catch(e) {}
+    el.classList.toggle('on', onMode || diTeksBerformat);
   });
   // Heading & blockquote: cek elemen induk dari node kursor.
   var sel = window.getSelection();
@@ -6077,18 +6081,53 @@ function ntRestoreSelection(range){
 }
 function ntCmd(cmd, val){
   ntFocusBody();
-  // Tombol = MODE MENULIS, bukan "hapus format".
-  //   - Kalau mode belum aktif  -> aktifkan (teks yang diketik berikutnya ikut
-  //     berformat; kalau ada teks tersorot, sorotan itu langsung diformat).
-  //   - Kalau mode sudah aktif  -> matikan mode saja. Teks yang SUDAH ditulis
-  //     dengan format itu DIBIARKAN (tidak diubah sama sekali).
-  // execCommand() sendiri bersifat toggle dan saat dimatikan ia hanya mengubah
-  // "state" pengetikan berikutnya, jadi cukup diteruskan.
-  document.execCommand(cmd, false, val || null);
+  // Tombol = MODE MENULIS.
+  //   - Belum aktif -> aktifkan: teks yang diketik berikutnya berformat
+  //     (kalau ada teks tersorot, sorotan itu langsung diformat).
+  //   - Sudah aktif -> matikan mode. Teks yang SUDAH ditulis DIBIARKAN.
+  //
+  // PENTING: execCommand() TIDAK bisa diandalkan untuk mematikan mode.
+  // Sudah diukur: setelah klik kedua, queryCommandState() tetap true dan
+  // teks berikutnya masih berformat. Karena itu mode dilacak sendiri
+  // (_ntInlineMode) dan diterapkan saat pengetikan.
+  var aktif = !!_ntInlineMode[cmd];
+  if (aktif) {
+    _ntInlineMode[cmd] = false;
+    // Matikan format pada state browser. Kalau browser menolak (WebKit/Blink
+    // sering begitu saat seleksi kosong), tidak masalah: saat pengetikan,
+    // ntApplyInlineMode() akan memaksa lepas formatnya.
+    try { document.execCommand(cmd, false, null); } catch(e) {}
+    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
+  } else {
+    _ntInlineMode[cmd] = true;
+    try { document.execCommand(cmd, false, val || null); } catch(e) {}
+    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' aktif', 'i');
+  }
   ntUpdateEmptyState();
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
+}
+var _ntInlineMode = {bold:false, italic:false, underline:false, strikeThrough:false};
+var NT_CMD_LABEL = {bold:'Tebal', italic:'Miring', underline:'Garis bawah', strikeThrough:'Coret'};
+var NT_CMD_TAG = {bold:'B', italic:'I', underline:'U', strikeThrough:'S'};
+/* Dipanggil saat pengguna mengetik: pastikan format teks baru SESUAI mode.
+   Ini yang membuat "klik kedua = off" benar-benar bekerja -- kita tidak lagi
+   bergantung pada execCommand() yang tidak konsisten. */
+function ntApplyInlineMode(){
+  var body = document.getElementById('nt-body');
+  var sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !body.contains(sel.anchorNode)) return;
+  for (var cmd in _ntInlineMode) {
+    var mau = _ntInlineMode[cmd];
+    var sudah;
+    try { sudah = document.queryCommandState(cmd); } catch(e) { sudah = false; }
+    if (mau === sudah) continue;
+    var r = sel.getRangeAt(0).cloneRange();
+    document.execCommand(cmd, false, null);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
 }
 /* Lepas format inline pada teks yang DIPILIH pengguna secara eksplisit.
    Sengaja TIDAK dipakai oleh ntCmd: klik tombol format tidak boleh mengubah
@@ -6406,8 +6445,8 @@ function ntRemoveSlashTrigger(){
 function ntHandleBodyInput(e){
   ntUpdateEmptyState();
   ntScheduleSave();
-  // Mode stabilo/warna ditangani sepenuhnya oleh execCommand (hiliteColor/
-  // foreColor), jadi tidak perlu memodifikasi DOM di sini.
+  // Pastikan format teks baru sesuai mode tombol (ini penentu "klik 2 = off").
+  ntApplyInlineMode();
   // Deteksi '/' di awal baris / setelah spasi untuk memicu slash menu.
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount || !sel.isCollapsed) { ntHideSlash(); return; }
