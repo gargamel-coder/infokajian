@@ -5996,11 +5996,23 @@ function ntFocusBody(){
   // stabilo/marker/format, tampilan "langsung ke atas" dan bukan di posisi
   // kursor saat ini. preventScroll mencegah perilaku itu.
   if (document.activeElement !== body) body.focus({preventScroll:true});
-  if (_ntSavedRange) {
+
+  // PENTING: JANGAN selalu menimpa seleksi dengan _ntSavedRange.
+  // Listener selectionchange menyimpan posisi setiap kali seleksi berubah --
+  // termasuk saat browser menaruh kursor di AWAL elemen ketika fokus berpindah.
+  // Kalau kita selalu memulihkannya, kursor melompat ke posisi lama yang salah
+  // dan ketikan masuk ke tempat yang tidak diinginkan (gejala "tidak bisa
+  // mengetik" / teks tidak muncul di posisi kursor).
+  // Jadi restore HANYA kalau seleksi sekarang benar-benar tidak ada / di luar
+  // editor. Kalau kursor masih valid di dalam editor, biarkan apa adanya.
+  var sel = window.getSelection();
+  var perluRestore = !sel || !sel.rangeCount || !body.contains(sel.anchorNode);
+  if (perluRestore && _ntSavedRange) {
     try {
-      var sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(_ntSavedRange);
+      if (body.contains(_ntSavedRange.commonAncestorContainer)) {
+        sel.removeAllRanges();
+        sel.addRange(_ntSavedRange);
+      }
     } catch(e) { /* range sudah tidak valid (DOM berubah) -- lanjut tanpa restore */ }
   }
 }
