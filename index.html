@@ -6098,34 +6098,39 @@ function ntRestoreSelection(range){
   sel.removeAllRanges();
   sel.addRange(range);
 }
+/* Pelindung anti-rekursi editor.
+   Dipakai bersama oleh ntCmd() dan ntApplyInlineMode().
+   Deklarasi WAJIB di sini (sebelum dipakai) supaya tidak bergantung hoisting. */
+var _ntApplyingFormat = false;
+
 function ntCmd(cmd, val){
-  ntFocusBody();
-  // Tombol = MODE MENULIS.
-  //   - Belum aktif -> aktifkan: teks yang diketik berikutnya berformat
-  //     (kalau ada teks tersorot, sorotan itu langsung diformat).
-  //   - Sudah aktif -> matikan mode. Teks yang SUDAH ditulis DIBIARKAN.
-  //
-  // PENTING: execCommand() TIDAK bisa diandalkan untuk mematikan mode.
-  // Sudah diukur: setelah klik kedua, queryCommandState() tetap true dan
-  // teks berikutnya masih berformat. Karena itu mode dilacak sendiri
-  // (_ntInlineMode) dan diterapkan saat pengetikan.
-  var aktif = !!_ntInlineMode[cmd];
-  if (aktif) {
-    _ntInlineMode[cmd] = false;
-    // Matikan format pada state browser. Kalau browser menolak (WebKit/Blink
-    // sering begitu saat seleksi kosong), tidak masalah: saat pengetikan,
-    // ntApplyInlineMode() akan memaksa lepas formatnya.
-    try { document.execCommand(cmd, false, null); } catch(e) {}
-    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
-  } else {
-    _ntInlineMode[cmd] = true;
-    try { document.execCommand(cmd, false, val || null); } catch(e) {}
-    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' aktif', 'i');
+  // Pelindung: klik tombol memicu execCommand -> event 'input' -> handler input
+  // menjalankan ntApplyInlineMode() lagi saat kita masih di tengah proses klik.
+  // Tanpa flag ini, urutannya berputar tanpa henti (RangeError: Maximum call
+  // stack size exceeded) dan seluruh editor ikut mati.
+  if (_ntApplyingFormat) return;
+  _ntApplyingFormat = true;
+  try {
+    // Tombol = MODE MENULIS.
+    //   - Belum aktif -> aktifkan (teks berikutnya berformat).
+    //   - Sudah aktif -> matikan mode. Teks yang SUDAH ditulis DIBIARKAN.
+    var aktif = !!_ntInlineMode[cmd];
+    if (aktif) {
+      _ntInlineMode[cmd] = false;
+      try { document.execCommand(cmd, false, null); } catch(e) {}
+      showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
+    } else {
+      _ntInlineMode[cmd] = true;
+      try { document.execCommand(cmd, false, val || null); } catch(e) {}
+      showToast('Mode ' + NT_CMD_LABEL[cmd] + ' aktif', 'i');
+    }
+    ntUpdateEmptyState();
+    ntScheduleSave();
+    ntUpdateToolbarState();
+    ntKeepCaretVisible();
+  } finally {
+    _ntApplyingFormat = false;
   }
-  ntUpdateEmptyState();
-  ntScheduleSave();
-  ntUpdateToolbarState();
-  ntKeepCaretVisible();
 }
 var _ntInlineMode = {bold:false, italic:false, underline:false, strikeThrough:false};
 var NT_CMD_LABEL = {bold:'Tebal', italic:'Miring', underline:'Garis bawah', strikeThrough:'Coret'};
@@ -6163,20 +6168,39 @@ function ntCaretInFormat(cmd){
   return false;
 }
 /* Dipanggil saat pengguna mengetik: pastikan format teks baru SESUAI mode.
-   Ini yang membuat "klik kedua = off" benar-benar bekerja -- kita tidak lagi
-   bergantung pada queryCommandState() yang tidak konsisten. */
+
+   ⚠️ REKURSI TAK TERBATAS (bug nyata, line ~6177):
+   Fungsi ini dipanggil dari handler 'input' editor. Di dalamnya ada
+   document.execCommand(...) -- dan execCommand MEMICU event 'input' LAGI.
+   Tanpa pelindung, urutannya berputar:
+     input -> ntApplyInlineMode -> execCommand -> input -> ntApplyInlineMode -> ...
+   Itu penyebab "RangeError: Maximum call stack size exceeded" yang muncul
+   bertubi-tubi, sekaligus membuat tombol format dan pengetikan mati total
+   (browser kehabisan stack, semua handler berikutnya gagal jalan).
+
+   Pelindung: flag _ntApplyingFormat (dideklarasikan di atas, sebelum ntCmd).
+   Selama kita sedang menerapkan format, handler 'input' yang terpicu oleh
+   execCommand akan diabaikan (return cepat). Pelindung dilepas dengan
+   try/finally supaya tidak "nyangkut" kalau error. */
 function ntApplyInlineMode(){
+  if (_ntApplyingFormat) return;        // <-- pelindung anti-rekursi
   var body = document.getElementById('nt-body');
+  if (!body) return;
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount || !body.contains(sel.anchorNode)) return;
-  for (var cmd in _ntInlineMode) {
-    var mau = _ntInlineMode[cmd];
-    var sudah = ntCaretInFormat(cmd);
-    if (mau === sudah) continue;
-    var r = sel.getRangeAt(0).cloneRange();
-    document.execCommand(cmd, false, null);
-    sel.removeAllRanges();
-    sel.addRange(r);
+  _ntApplyingFormat = true;
+  try {
+    for (var cmd in _ntInlineMode) {
+      var mau = _ntInlineMode[cmd];
+      var sudah = ntCaretInFormat(cmd);
+      if (mau === sudah) continue;      // nilai sudah sesuai: jangan sentuh DOM
+      var r = sel.getRangeAt(0).cloneRange();
+      document.execCommand(cmd, false, null);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+  } finally {
+    _ntApplyingFormat = false;
   }
 }
 /* Lepas format inline pada teks yang DIPILIH pengguna secara eksplisit.
@@ -6383,6 +6407,15 @@ function ntApplyTextColor(cls){
   ntKeepCaretVisible(); ntScheduleSave();
 }
 function ntSetWrapMode(mode, jenis){
+  if (_ntApplyingFormat) return;      // pelindung anti-rekursi (lihat ntCmd)
+  _ntApplyingFormat = true;
+  try {
+    _ntSetWrapModeInner(mode, jenis);
+  } finally {
+    _ntApplyingFormat = false;
+  }
+}
+function _ntSetWrapModeInner(mode, jenis){
   _ntWrapMode = mode;
   document.execCommand(mode ? (mode.jenis === 'hl' ? 'hiliteColor' : 'foreColor') : null, false,
     mode ? (mode.jenis === 'hl' ? NT_HL_HEX[mode.cls] : NT_TXT_HEX[mode.cls])
