@@ -1706,16 +1706,26 @@ function showBanner() {
 </div>
 
 <script>
-// Global error handler for debugging on mobile
+// Global error handler: catat ke console saja.
+//
+// BUG YANG PERNAH TERJADI: sebelumnya handler ini menulis ke elemen debug di
+// layar lewat `innerHTML += ...`. Saat terjadi error yang berulang cepat
+// (mis. RangeError), setiap laporan error memicu perubahan DOM lagi sehingga
+// handler terpanggil berulang -> "Maximum call stack size exceeded" muncul
+// bertubi-tubi di layar tanpa henti. Selain itu, pengguna tidak seharusnya
+// melihat pesan error mentah.
+// Sekarang: cukup catat ke console, dan pakai pelindung agar handler ini
+// tidak pernah memicu dirinya sendiri.
+var _ikErrSedangJalan = false;
 window.onerror = function(msg, url, line, col, error) {
-  var errDiv = document.getElementById('js-error-debug');
-  if (!errDiv) {
-    errDiv = document.createElement('div');
-    errDiv.id = 'js-error-debug';
-    errDiv.style.cssText = 'position:fixed;bottom:60px;left:10px;right:10px;background:#C62828;color:#fff;padding:12px;border-radius:12px;z-index:9999;font-size:12px;font-family:monospace;max-height:120px;overflow:auto;word-break:break-all';
-    document.body.appendChild(errDiv);
-  }
-  errDiv.innerHTML += 'Error: ' + msg + ' (line ' + line + ')<br>';
+  if (_ikErrSedangJalan) return true;   // pelindung anti-loop
+  _ikErrSedangJalan = true;
+  try {
+    if (window.console && console.warn) {
+      console.warn('[InfoKajian] Error:', msg, 'line', line);
+    }
+  } catch (e) { /* jangan pernah melempar dari handler error */ }
+  _ikErrSedangJalan = false;
   return false;
 };
 
