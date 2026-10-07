@@ -1765,7 +1765,9 @@ function _onFirebaseReady() {
   if (_firebaseReadyCalled) return;
   _firebaseReadyCalled = true;
   (async function() {
-    try { await fsSeedInitialData(); await fsLoadAll(); } catch(e) { console.warn('Initial load error:', e); }
+    // Refresh katalog publik di belakang (tidak memblokir auth). Cache yang
+    // sudah dipulihkan tetap tampil; error ditangani di dalam fsLoadAll.
+    Promise.resolve(fsLoadAll()).catch(function(e) { console.warn('Catalog refresh error:', e); });
     try {
       if (Array.isArray(DB.users)) {
         var _adminUser = DB.users.find(function(u){ return u.email === 'syahlanxzaelani@gmail.com'; });
@@ -1818,7 +1820,8 @@ function _onFirebaseReady() {
 }
 
 // Try immediate init (works when SDK already loaded synchronously)
-_lateInitFirebase();
+// Wait until this script has initialized DB/state/listener handles.
+queueMicrotask(_lateInitFirebase);
 
 // Helper: get auth/db safely at any time
 function getAuth() { if (auth) return auth; try { auth = firebase.auth(); return auth; } catch(e) { return null; } }
@@ -1871,30 +1874,21 @@ async function fsLoadUserData(uid) {
 }
 async function fsLoadAll() {
   if (!db) return;
-  try {
-    const [speakers, mosques, kajian, users] = await Promise.all([
-      fsLoadCollection('speakers'),
-      fsLoadCollection('mosques'),
-      fsLoadCollection('kajian'),
-      fsLoadCollection('users'),
-    ]);
-    // Replace local seed data entirely with Firestore data
-    // Deduplicate by id to prevent doubles
-    function dedup(arr) {
-      var seen = {};
-      return arr.filter(function(x) { if (seen[x.id]) return false; seen[x.id] = true; return true; });
+  const started = performance.now();
+  await Promise.all(['speakers', 'mosques', 'kajian'].map(async function(name) {
+    try {
+      // get() tanpa source: Firestore pakai cache lokal dulu lalu sinkron ke
+      // server, jadi tidak menunggu jaringan saat cache sudah ada. Hasil yang
+      // gagal BUKAN berarti katalog kosong (jangan timpa cache dengan []).
+      const snap = await db.collection(name).get();
+      applyPublicCatalog(name, snap.docs.map(function(d) { var o=d.data(); o.id=d.id; return o; }));
+    } catch(e) {
+      if (!_catalogLoaded[name]) _catalogErrors[name] = true;
+      debounceRefresh();
+      console.warn('Catalog read error:', name, e);
     }
-    DB.speakers = dedup(speakers);
-    DB.mosques = dedup(mosques);
-    DB.kajian = dedup(kajian);
-    if (users.length) {
-      // Merge Firestore users with any local-only users (e.g. seed), dedup by id
-      var merged = dedup(users.concat(DB.users.filter(function(lu){
-        return !users.find(function(fu){return fu.id===lu.id;});
-      })));
-      DB.users = merged;
-    }
-  } catch(e) { console.warn('Load all error:', e); }
+  }));
+  performance.measure('ik-catalog-refresh', {start:started, end:performance.now()});
 }
 async function fsSeedInitialData() {
   if (!db) return;
@@ -1942,19 +1936,19 @@ function startRealtimeListeners() {
   // overwriting DB right after an admin delete/write operation.
   _collectionUnsubs.push(db.collection('speakers').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    DB.speakers = snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; });
+    applyPublicCatalog('speakers', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
     debounceRefresh();
   }, function(err) { console.warn('speakers listener error:', err); }));
 
   _collectionUnsubs.push(db.collection('mosques').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    DB.mosques = snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; });
+    applyPublicCatalog('mosques', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
     debounceRefresh();
   }, function(err) { console.warn('mosques listener error:', err); }));
 
   _collectionUnsubs.push(db.collection('kajian').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    DB.kajian = snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; });
+    applyPublicCatalog('kajian', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
     debounceRefresh();
   }, function(err) { console.warn('kajian listener error:', err); }));
 
@@ -2027,6 +2021,43 @@ const DB = {
 };
 
 // ══════════════════════════════════════════
+// Cache only the public catalog. Never serialize DB/users or private state.
+const PUBLIC_CATALOG_KEY = 'ik-public-catalog-v1';
+var _catalogLoaded = {speakers:false, mosques:false, kajian:false};
+var _catalogErrors = {};
+function applyPublicCatalog(name, records) {
+  if (!Object.prototype.hasOwnProperty.call(_catalogLoaded, name)) return;
+  var seen = new Set();
+  DB[name] = records.filter(function(x) { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
+  _catalogLoaded[name] = true;
+  delete _catalogErrors[name];
+  try {
+    var catalog = {};
+    Object.keys(_catalogLoaded).forEach(function(key) { if (_catalogLoaded[key]) catalog[key] = DB[key]; });
+    localStorage.setItem(PUBLIC_CATALOG_KEY, JSON.stringify({version:1, updatedAt:Date.now(), catalog:catalog}));
+  } catch(e) { /* unavailable storage/quota must not prevent rendering */ }
+  debounceRefresh();
+}
+function hydratePublicCatalog() {
+  try {
+    var cache = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_KEY));
+    if (!cache || cache.version !== 1 || !cache.catalog) return;
+    Object.keys(_catalogLoaded).forEach(function(name) {
+      var rows = cache.catalog[name];
+      if (!Array.isArray(rows) || !rows.every(function(x) { return x && typeof x === 'object' && typeof x.id === 'string'; })) return;
+      DB[name] = rows;
+      _catalogLoaded[name] = true;
+    });
+  } catch(e) { /* malformed or denied cache is a first visit */ }
+  performance.mark('ik-catalog-hydrated');
+}
+function catalogLoadingHTML() {
+  return '<div role="status" style="padding:24px;color:var(--muted)">' +
+    (_catalogErrors.kajian ? 'Katalog belum dapat dimuat. Periksa koneksi internet.' : 'Memuat katalog kajian terbaru…') +
+    '<div aria-hidden="true" style="height:72px;margin-top:16px;border-radius:12px;background:var(--pl)"></div></div>';
+}
+hydratePublicCatalog();
+
 // STATE
 // ══════════════════════════════════════════
 let state = {
@@ -2790,7 +2821,9 @@ function renderHome() {
   list = list.slice(0, maxShow);
   const nearbyEl = document.getElementById('nearby-list');
   if (nearbyEl) {
-    if (list.length>0) {
+    if (!_catalogLoaded.kajian) {
+      nearbyEl.innerHTML = catalogLoadingHTML();
+    } else if (list.length>0) {
       nearbyEl.innerHTML = list.map(k=>kajianCardHTML(k,k.dist!=null&&k.dist!==Infinity?k.dist:null)).join('');
     } else {
       nearbyEl.innerHTML = emptyStateHTML('book','Belum ada kajian hari ini','Cek kajian mendatang di halaman Kajian','Jelajahi Kajian',"goScreen('kajian')");
