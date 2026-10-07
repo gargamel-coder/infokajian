@@ -6064,23 +6064,89 @@ function ntRestoreSelection(range){
 }
 function ntCmd(cmd, val){
   ntFocusBody();
-  document.execCommand(cmd, false, val || null);
+  // KLIK KEDUA = MATIKAN. execCommand() sebenarnya sudah toggle, TAPI tidak
+  // andal saat seleksi hanya berupa KURSOR (collapsed) di dalam teks yang
+  // sudah berformat: di WebKit/Blink kadang tidak melepas formatnya, jadi
+  // tombol garis bawah/coret/tebal terasa "tidak bisa dimatikan" (bug yang
+  // dilaporkan). Karena itu saat kursor berada DI DALAM teks yang sudah
+  // berformat, kita lepas formatnya secara eksplisit.
+  var sedangAktif = false;
+  try { sedangAktif = document.queryCommandState(cmd); } catch(e) {}
+  if (sedangAktif) {
+    ntClearInlineFormat(cmd);
+  } else {
+    document.execCommand(cmd, false, val || null);
+  }
   ntUpdateEmptyState();
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
 }
+/* Lepas format inline (bold/italic/underline/coret) pada seleksi ATAU pada
+   kata tempat kursor berada. Dipakai saat tombol format ditekan kedua kali. */
+var NT_INLINE_TAGS = {bold:['B','STRONG'], italic:['I','EM'], underline:['U'], strikeThrough:['S','STRIKE','DEL']};
+function ntClearInlineFormat(cmd){
+  var tags = NT_INLINE_TAGS[cmd];
+  if (!tags) { document.execCommand(cmd, false, null); return; }
+  var sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  var range = sel.getRangeAt(0);
+  var body = document.getElementById('nt-body');
+  // Tentukan cakupan: kalau ada teks tersorot pakai sorotan itu, kalau tidak
+  // pakai seluruh ISI dari elemen pembungkus tempat kursor berada.
+  var scope = null;
+  if (!range.collapsed) {
+    scope = range.cloneRange();
+  } else {
+    var node = range.startContainer;
+    var el = node.nodeType === 3 ? node.parentElement : node;
+    while (el && el !== body && tags.indexOf(el.tagName) === -1) el = el.parentElement;
+    if (el && el !== body) { scope = document.createRange(); scope.selectNodeContents(el); }
+  }
+  if (!scope) return;
+  // Kumpulkan semua elemen format yang berada di dalam cakupan.
+  var dalamCakupan = [];
+  var walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
+  var n;
+  while ((n = walker.nextNode())) {
+    if (tags.indexOf(n.tagName) > -1 && scope.intersectsNode(n)) dalamCakupan.push(n);
+  }
+  // Lepas pembungkusnya, teks tetap utuh.
+  dalamCakupan.forEach(function(el){
+    if (!el.parentNode) return;
+    var parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  });
+  // Normalisasi tag sisa supaya tidak bersarang ganda.
+  try { body.normalize(); } catch(e) {}
+}
 function ntHeading(level){
   ntFocusBody();
-  document.execCommand('formatBlock', false, 'H'+level);
+  // Klik kedua pada H1/H2 yang sama = kembalikan ke paragraf biasa (toggle off).
+  var sedangH = false;
+  try { sedangH = ntBlockIs('H'+level); } catch(e) {}
+  document.execCommand('formatBlock', false, sedangH ? 'P' : 'H'+level);
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
 }
+/* Apakah blok tempat kursor berada bertipe tag tertentu (mis. H1/H2/BLOCKQUOTE)? */
+function ntBlockIs(tag){
+  var sel = window.getSelection();
+  if (!sel || !sel.anchorNode) return false;
+  var el = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+  var body = document.getElementById('nt-body');
+  while (el && el !== body) { if (el.tagName === tag) return true; el = el.parentElement; }
+  return false;
+}
 function ntInsertList(kind){
   ntFocusBody();
+  // Klik kedua pada jenis daftar yang sama = lepas daftar (toggle off).
+  // execCommand() untuk list sudah bersifat toggle, jadi cukup diteruskan.
   document.execCommand(kind==='ol' ? 'insertOrderedList' : 'insertUnorderedList', false, null);
   ntScheduleSave();
+  ntUpdateToolbarState();
   ntKeepCaretVisible();
 }
 function ntInsertTodo(){
