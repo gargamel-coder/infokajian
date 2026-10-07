@@ -3026,6 +3026,8 @@ function renderKajianList() {
   const isAdmin = state.user&&state.user.role==='admin';
   let list = DB.kajian.filter(k=>{
     if(k.status==='pending' && !isAdmin) return false;
+    // Hanya tampilkan kajian yang belum lewat (kecuali admin memfilter tanggal tertentu)
+    if(!state.kajianDate && k.date && k.date < T) return false;
     var spkF=getSpeaker(k.speaker_id); if(q && !(spkF&&spkF.full_name.toLowerCase().includes(q.toLowerCase())) && !k.title.toLowerCase().includes(q.toLowerCase())) return false;
     if(state.kajianDate && k.date!==state.kajianDate) return false;
     if(state.kajianTopic && k.topic!==state.kajianTopic) return false;
@@ -3033,7 +3035,12 @@ function renderKajianList() {
   }).map(k=>{
     const m=getMosque(k.mosque_id);
     var copy2={}; for(var _k2 in k) copy2[_k2]=k[_k2]; copy2.dist=state.location&&m?haversine(state.location.lat,state.location.lng,m.lat,m.lng):null; return copy2;
-  }).sort((a,b)=>{if(a.date!==b.date)return a.date.localeCompare(b.date);return(a.dist!=null?a.dist:Infinity)-(b.dist!=null?b.dist:Infinity);});
+  }).sort((a,b)=>{
+    // Terdekat lebih dulu berdasarkan tanggal, lalu jarak; jam sebagai penentu akhir.
+    if(a.date!==b.date) return a.date.localeCompare(b.date);
+    if((a.time||'')!==(b.time||'')) return (a.time||'').localeCompare(b.time||'');
+    return (a.dist!=null?a.dist:Infinity)-(b.dist!=null?b.dist:Infinity);
+  });
   const listEl = document.getElementById('kajian-list');
   if(listEl) {
     listEl.innerHTML = list.length>0

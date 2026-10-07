@@ -1,0 +1,367 @@
+{
+  "kajian": [
+    {
+      "id": "k1781000050000",
+      "title": "Kajian Tafsir Ibnu Katsir - Ustadz DR. Elfa Hendri Mukhlis, MA",
+      "topic": "Tafsir Ibnu Katsir",
+      "speaker_id": "s1781000777000",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-05",
+      "time": "15.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050001",
+      "title": "Kajian Kitab Talbis Iblis - Ustadz DR. Syafiq Al-Khatieb, Lc., MA",
+      "topic": "Kitab Talbis Iblis",
+      "speaker_id": "s1781000777001",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-05",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050002",
+      "title": "Kajian At Tazkirah - Ustadz Abu Hurairah, M.A",
+      "topic": "At Tazkirah",
+      "speaker_id": "s1781000777002",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-06",
+      "time": "15.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050003",
+      "title": "Kajian Kajian Kitab - Ustadz Fatahillah Aly, S.Ag",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777003",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-06",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050004",
+      "title": "Kajian Kajian Kitab - Ustadz Yovin Abu Hammam",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777004",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-07",
+      "time": "12.30",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050005",
+      "title": "Kajian Riyadush Shalihin - Ustadz Idrus Yusuf, MA",
+      "topic": "Riyadush Shalihin",
+      "speaker_id": "s1781000777005",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-07",
+      "time": "15.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050006",
+      "title": "Kajian Dosa-Dosa Besar - Ustadz Khalid Basalamah",
+      "topic": "Dosa-Dosa Besar",
+      "speaker_id": "s4",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-07",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050007",
+      "title": "Kajian Kajian Kitab - Ustadz Ahmad Zainuddin Al Banjari, Lc., MA",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777007",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-08",
+      "time": "12.30",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050008",
+      "title": "Kajian Fiqih Dzikir dan Do'a - Ustadz DR. Nurdin Apud Sarbini, Lc., M.Pd",
+      "topic": "Fiqih Dzikir dan Do'a",
+      "speaker_id": "s1781000777008",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-08",
+      "time": "15.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050009",
+      "title": "Kajian Kajian Ilmiah - Ustadz Imam Syuhada, Lc",
+      "topic": "Kajian Ilmiah",
+      "speaker_id": "s1781000777009",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-08",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050010",
+      "title": "Kajian Khutbah Jum'at - Ustadz DR. Cecep Rahmat, M.Ag",
+      "topic": "Khutbah Jum'at",
+      "speaker_id": "s1781000777010",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-09",
+      "time": "11.45",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050011",
+      "title": "Kajian Kajian Kitab - Ustadz Masykur Abu Mawaddah",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777011",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-09",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050012",
+      "title": "Kajian Tadzkiratus Saami - Ustadz Muhammad Nuzul Dzikri",
+      "topic": "Tadzkiratus Saami",
+      "speaker_id": "s1773670241268",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-10",
+      "time": "07.00",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050013",
+      "title": "Kajian Kajian Kitab - Ustadz Mohamad Nursamsul Qomar, Lc",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777013",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-10",
+      "time": "10.00",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050014",
+      "title": "Kajian Sirah Nabawiyah/Sahabat - Ustadz Khalid Basalamah",
+      "topic": "Sirah Nabawiyah/Sahabat",
+      "speaker_id": "s4",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-10",
+      "time": "13.00",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050015",
+      "title": "Kajian Kajian Psikologi - Ustadz Kak Yogi Kusprayogi, M. PSi",
+      "topic": "Kajian Psikologi",
+      "speaker_id": "s1781000777015",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-11",
+      "time": "08.30",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050016",
+      "title": "Kajian Kajian Ilmiah - Ustadz Prof. DR. Ali Musri Semjan Putra, Lc., MA",
+      "topic": "Kajian Ilmiah",
+      "speaker_id": "s1781000777016",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-11",
+      "time": "12.30",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050017",
+      "title": "Kajian Kajian Kitab - Ustadz Najmi Umar Bakkar",
+      "topic": "Kajian Kitab",
+      "speaker_id": "s1781000777017",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-11",
+      "time": "15.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    },
+    {
+      "id": "k1781000050018",
+      "title": "Kajian Kajian Ilmiah - Ustadz Hamdi Solah Al-Bakry, Lc",
+      "topic": "Kajian Ilmiah",
+      "speaker_id": "s1781000777018",
+      "mosque_id": "m1773644943526",
+      "date": "2026-10-11",
+      "time": "18.15",
+      "status": "approved",
+      "description": "Kajian rutin di Masjid Nurul Iman (Blok M Square). Sumber: @masjidnuruliman",
+      "source": "@masjidnuruliman",
+      "submitted_by": "u3"
+    }
+  ],
+  "speakers_baru": [
+    {
+      "id": "s1781000777000",
+      "full_name": "Ustadz DR. Elfa Hendri Mukhlis, MA",
+      "normalized_name": "ustadz dr. elfa hendri mukhlis, ma",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777001",
+      "full_name": "Ustadz DR. Syafiq Al-Khatieb, Lc., MA",
+      "normalized_name": "ustadz dr. syafiq al-khatieb, lc., ma",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777002",
+      "full_name": "Ustadz Abu Hurairah, M.A",
+      "normalized_name": "ustadz abu hurairah, m.a",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777003",
+      "full_name": "Ustadz Fatahillah Aly, S.Ag",
+      "normalized_name": "ustadz fatahillah aly, s.ag",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777004",
+      "full_name": "Ustadz Yovin Abu Hammam",
+      "normalized_name": "ustadz yovin abu hammam",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777005",
+      "full_name": "Ustadz Idrus Yusuf, MA",
+      "normalized_name": "ustadz idrus yusuf, ma",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777007",
+      "full_name": "Ustadz Ahmad Zainuddin Al Banjari, Lc., MA",
+      "normalized_name": "ustadz ahmad zainuddin al banjari, lc., ma",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777008",
+      "full_name": "Ustadz DR. Nurdin Apud Sarbini, Lc., M.Pd",
+      "normalized_name": "ustadz dr. nurdin apud sarbini, lc., m.pd",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777009",
+      "full_name": "Ustadz Imam Syuhada, Lc",
+      "normalized_name": "ustadz imam syuhada, lc",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777010",
+      "full_name": "Ustadz DR. Cecep Rahmat, M.Ag",
+      "normalized_name": "ustadz dr. cecep rahmat, m.ag",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777011",
+      "full_name": "Ustadz Masykur Abu Mawaddah",
+      "normalized_name": "ustadz masykur abu mawaddah",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777013",
+      "full_name": "Ustadz Mohamad Nursamsul Qomar, Lc",
+      "normalized_name": "ustadz mohamad nursamsul qomar, lc",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777015",
+      "full_name": "Ustadz Kak Yogi Kusprayogi, M. PSi",
+      "normalized_name": "ustadz kak yogi kusprayogi, m. psi",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777016",
+      "full_name": "Ustadz Prof. DR. Ali Musri Semjan Putra, Lc., MA",
+      "normalized_name": "ustadz prof. dr. ali musri semjan putra, lc., ma",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777017",
+      "full_name": "Ustadz Najmi Umar Bakkar",
+      "normalized_name": "ustadz najmi umar bakkar",
+      "verified": true,
+      "created_by": "u3"
+    },
+    {
+      "id": "s1781000777018",
+      "full_name": "Ustadz Hamdi Solah Al-Bakry, Lc",
+      "normalized_name": "ustadz hamdi solah al-bakry, lc",
+      "verified": true,
+      "created_by": "u3"
+    }
+  ],
+  "source": "@masjidnuruliman",
+  "mosque_id": "m1773644943526"
+}
