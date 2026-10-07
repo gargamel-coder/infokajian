@@ -6029,13 +6029,10 @@ function ntUpdateToolbarState(){
   NT_STATE_BTNS.forEach(function(b){
     var el = document.querySelector('.nt-bar-row '+b.sel);
     if (!el) return;
-    // Indikator mengikuti MODE yang kita lacak (bukan queryCommandState yang
-    // tidak konsisten saat seleksi kosong), TAPI tetap menyala kalau kursor
-    // berada di teks yang sudah berformat itu.
-    var onMode = !!_ntInlineMode[b.cmd];
-    var diTeksBerformat = false;
-    try { diTeksBerformat = document.queryCommandState(b.cmd); } catch(e) {}
-    el.classList.toggle('on', onMode || diTeksBerformat);
+    // Indikator mengikuti MODE yang dilacak. Sengaja TIDAK memakai deteksi
+    // "kursor di teks berformat lama", karena setelah klik kedua tombol akan
+    // tampak masih menyala (membingungkan) walau mode sudah dimatikan.
+    el.classList.toggle('on', !!_ntInlineMode[b.cmd]);
   });
   // Heading & blockquote: cek elemen induk dari node kursor.
   var sel = window.getSelection();
@@ -6111,17 +6108,48 @@ function ntCmd(cmd, val){
 var _ntInlineMode = {bold:false, italic:false, underline:false, strikeThrough:false};
 var NT_CMD_LABEL = {bold:'Tebal', italic:'Miring', underline:'Garis bawah', strikeThrough:'Coret'};
 var NT_CMD_TAG = {bold:'B', italic:'I', underline:'U', strikeThrough:'S'};
+/* Tag yang setara untuk tiap perintah (execCommand bisa menghasilkan berbagai
+   varian: <b>/<strong>, <i>/<em>, <s>/<strike>/<del>, atau <span style=...>). */
+var NT_CMD_TAGS = {
+  bold:['B','STRONG'],
+  italic:['I','EM'],
+  underline:['U'],
+  strikeThrough:['S','STRIKE','DEL']
+};
+function ntTagDariEl(el, cmd){
+  if (!el || el.nodeType !== 1) return false;
+  if (NT_CMD_TAGS[cmd].indexOf(el.tagName) > -1) return true;
+  var st = el.getAttribute && el.getAttribute('style');
+  if (st) {
+    if (cmd === 'underline' && /text-decoration[^;]*underline/i.test(st)) return true;
+    if (cmd === 'strikeThrough' && /line-through/i.test(st)) return true;
+  }
+  return false;
+}
+/* Apakah kursor sedang di dalam format tertentu?
+   Menggantikan queryCommandState() yang TERBUKTI tidak akurat di WebKit:
+   queryCommandState('strikeThrough') melaporkan false walau kursor berada di
+   dalam <s>, dan hal serupa terjadi pada underline. Itulah sebabnya tombol
+   garis bawah & coret terasa "tidak berfungsi" sedangkan tebal/miring normal. */
+function ntCaretInFormat(cmd){
+  var sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  var body = document.getElementById('nt-body');
+  var node = sel.getRangeAt(0).startContainer;
+  var el = node && node.nodeType === 3 ? node.parentElement : node;
+  while (el && el !== body) { if (ntTagDariEl(el, cmd)) return true; el = el.parentElement; }
+  return false;
+}
 /* Dipanggil saat pengguna mengetik: pastikan format teks baru SESUAI mode.
    Ini yang membuat "klik kedua = off" benar-benar bekerja -- kita tidak lagi
-   bergantung pada execCommand() yang tidak konsisten. */
+   bergantung pada queryCommandState() yang tidak konsisten. */
 function ntApplyInlineMode(){
   var body = document.getElementById('nt-body');
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount || !body.contains(sel.anchorNode)) return;
   for (var cmd in _ntInlineMode) {
     var mau = _ntInlineMode[cmd];
-    var sudah;
-    try { sudah = document.queryCommandState(cmd); } catch(e) { sudah = false; }
+    var sudah = ntCaretInFormat(cmd);
     if (mau === sudah) continue;
     var r = sel.getRangeAt(0).cloneRange();
     document.execCommand(cmd, false, null);
