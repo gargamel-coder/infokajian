@@ -6114,18 +6114,13 @@ function ntUpdateToolbarState(){
   NT_STATE_BTNS.forEach(function(b){
     var el = document.querySelector('.nt-bar-row '+b.sel);
     if (!el) return;
-    // LANGKAH 3: indikator = MODE yang dilacak ATAU kursor berada di teks
-    // berformat. bold/italic pakai queryCommandState; underline/strike pakai
-    // deteksi tag sendiri (queryCommandState tidak akurat di WebKit).
-    var onMode = !!_ntInlineMode[b.cmd];
-    var diTeks = false;
-    if (b.pakaiQuery) {
-      try { diTeks = document.queryCommandState(b.cmd); } catch(e) { diTeks = false; }
-      if (!diTeks) diTeks = ntCaretInFormat(b.cmd);
-    } else {
-      diTeks = ntCaretInFormat(b.cmd);
-    }
-    el.classList.toggle('on', onMode || diTeks);
+    // Indikator mengikuti MODE yang kita lacak saja.
+    // CATATAN (terukur): setelah mode dimatikan, queryCommandState() masih
+    // melaporkan true (state pengetikan browser belum lepas) dan ntCaretInFormat
+    // bisa masih true bila kursor belum sempat keluar tag. Akibatnya tombol
+    // tampak "tidak mau mati" padahal mode sudah off. Karena itu indikator
+    // hanya membaca _ntInlineMode.
+    el.classList.toggle('on', !!_ntInlineMode[b.cmd]);
   });
   // Heading & blockquote: cek elemen induk dari node kursor.
   var sel = window.getSelection();
@@ -6211,7 +6206,15 @@ function ntCmdInner(cmd, val){
   var aktif = !!_ntInlineMode[cmd];
   if (aktif) {
     _ntInlineMode[cmd] = false;
+    // Matikan state pengetikan di browser. PENTING: lakukan SETELAH kursor
+    // keluar dari tag, karena execCommand bekerja pada posisi kursor.
     try { document.execCommand(cmd, false, null); } catch(e) {}
+    // Pindahkan kursor keluar dari tag (terukur: perpindahan seleksi saja
+    // tidak cukup -- insertText tetap menulis ke elemen inline terdekat,
+    // jadi tag dipecah di posisi kursor oleh ntKeluarDariTag).
+    ntKeluarDariTag(cmd);
+    try { document.execCommand(cmd, false, null); } catch(e) {}
+    ntUpdateToolbarState();
     showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
   } else {
     _ntInlineMode[cmd] = true;
@@ -6222,6 +6225,83 @@ function ntCmdInner(cmd, val){
   ntScheduleSave();
   ntUpdateToolbarState();
   ntKeepCaretVisible();
+}
+/* Pindahkan kursor keluar dari tag format tertentu, DAN pastikan ketikan
+   berikutnya benar-benar masuk ke luar tag.
+
+   Catatan penting (terukur): sekadar memindahkan seleksi TIDAK cukup --
+   execCommand('insertText') di browser tetap menulis ke dalam elemen inline
+   terdekat, walau kursor sudah dipindah. Karena itu kita PECAH tag di posisi
+   kursor lebih dulu (splitText), sehingga teks lama tetap di dalam tag dan
+   ketikan berikutnya jatuh di luar tag. Teks lama tidak diubah. */
+function ntKeluarDariTag(cmd){
+  var body = document.getElementById('nt-body');
+  var sel = window.getSelection();
+  if (!body || !sel || !sel.rangeCount) return;
+  var range = sel.getRangeAt(0);
+  var node = range.startContainer;
+  var el = node && node.nodeType === 3 ? node.parentElement : node;
+  var w = null;
+  while (el && el !== body) { if (ntTagDariEl(el, cmd)) { w = el; break; } el = el.parentElement; }
+  if (!w || !w.parentNode) return;
+
+  // 1) Pecah simpul teks tepat di posisi kursor (kalau kursor di tengah teks),
+  //    supaya bagian setelah kursor bisa dipindah keluar dari tag.
+  var setelah = null;
+  if (node.nodeType === 3 && node.parentNode === w) {
+    setelah = node.splitText(range.startOffset);
+  } else {
+    // kursor di antara anak elemen: ambil anak setelah posisi kursor
+    var anak = w.childNodes;
+    if (range.startOffset < anak.length) setelah = anak[range.startOffset];
+  }
+
+  // 2) Pindahkan sisa teks (setelah kursor) keluar dari tag, ke simpul teks
+  //    baru setelah w. Dengan begini w hanya berisi teks SEBELUM kursor.
+  if (setelah) {
+    // Kumpulkan teks dari simpul-simpul setelah posisi kursor.
+    // PENTING: kumpulkan dulu isinya, BARU hapus -- jangan menghapus sambil
+    // berjalan (menyebabkan NotFoundError karena node sudah lepas dari parent).
+    var kumpulanIsi = [], kumpulanNode = [];
+    var n = setelah;
+    while (n) {
+      var nxt = n.nextSibling;
+      kumpulanIsi.push(n.textContent || '');
+      kumpulanNode.push(n);
+      n = nxt;
+    }
+    var teksSisa = kumpulanIsi.join('');
+    if (teksSisa) {
+      kumpulanNode.forEach(function(x){
+        if (x.parentNode === w) w.removeChild(x);
+      });
+      var baru = document.createTextNode(teksSisa);
+      if (w.nextSibling) w.parentNode.insertBefore(baru, w.nextSibling);
+      else w.parentNode.appendChild(baru);
+      var r2 = document.createRange();
+      r2.setStart(baru, 0);
+      r2.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r2);
+      return;
+    }
+    // tidak ada teks tersisa: hapus simpul kosongnya saja
+    kumpulanNode.forEach(function(x){
+      if (x.parentNode === w) w.removeChild(x);
+    });
+  }
+
+  // 3) Tidak ada teks setelah kursor: sediakan simpul kosong di luar tag.
+  var anchor = w.nextSibling;
+  if (!anchor || anchor.nodeType !== 3) {
+    anchor = document.createTextNode('');
+    w.parentNode.insertBefore(anchor, w.nextSibling);
+  }
+  var r3 = document.createRange();
+  r3.setStart(anchor, 0);
+  r3.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r3);
 }
 var _ntInlineMode = {bold:false, italic:false, underline:false, strikeThrough:false};
 var NT_CMD_LABEL = {bold:'Tebal', italic:'Miring', underline:'Garis bawah', strikeThrough:'Coret'};
