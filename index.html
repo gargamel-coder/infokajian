@@ -5978,7 +5978,12 @@ document.addEventListener('selectionchange', function(){
 });
 function ntFocusBody(){
   var body = document.getElementById('nt-body');
-  if (document.activeElement !== body) body.focus();
+  // BUG: di HP (iOS/Android), .focus() TANPA preventScroll menyuruh browser
+  // menggulir ke elemen yang difokus. #nt-body tinggi (seluruh isi catatan),
+  // jadi yang muncul adalah bagian ATASNYA -- itulah kenapa setiap kali klik
+  // stabilo/marker/format, tampilan "langsung ke atas" dan bukan di posisi
+  // kursor saat ini. preventScroll mencegah perilaku itu.
+  if (document.activeElement !== body) body.focus({preventScroll:true});
   if (_ntSavedRange) {
     try {
       var sel = window.getSelection();
@@ -5986,6 +5991,20 @@ function ntFocusBody(){
       sel.addRange(_ntSavedRange);
     } catch(e) { /* range sudah tidak valid (DOM berubah) -- lanjut tanpa restore */ }
   }
+}
+/* Gulirkan baris kursor ke dalam area terlihat TANPA melompat ke atas.
+   Dipanggil setelah menerapkan format supaya pengguna tetap melihat tempat
+   ia sedang mengetik (perilaku yang diharapkan), bukan bagian atas catatan. */
+function ntKeepCaretVisible(){
+  var sc = document.getElementById('nt-scroll');
+  var sel = window.getSelection();
+  if (!sc || !sel || !sel.rangeCount) return;
+  var rc = sel.getRangeAt(0).getClientRects()[0];
+  if (!rc) return;
+  var atas = sc.getBoundingClientRect().top + 12;
+  var bawah = sc.getBoundingClientRect().bottom - 12;
+  if (rc.top < atas) sc.scrollTop -= (atas - rc.top);
+  else if (rc.bottom > bawah) sc.scrollTop += (rc.bottom - bawah);
 }
 /* ---------- Indikator format aktif (nyala saat kursor di teks berformat) ---------- */
 var NT_STATE_BTNS = [
@@ -6023,6 +6042,14 @@ function ntUpdateToolbarState(){
   if (h1Btn) h1Btn.classList.toggle('on', h1);
   if (h2Btn) h2Btn.classList.toggle('on', h2);
   if (qBtn)  qBtn.classList.toggle('on', quote);
+  // Stabilo & warna teks: tombolnya menyala saat kursor berada di teks
+  // berstabilo/berwarna, supaya jelas format apa yang sedang aktif dan
+  // tap ulang akan mematikannya.
+  var wrap = ntActiveWrapEl();
+  var hlBtn = document.querySelector('.nt-bar-row [onclick="ntTogglePalette(\'highlight\')"]');
+  var clBtn = document.querySelector('.nt-bar-row [onclick="ntTogglePalette(\'color\')"]');
+  if (hlBtn) hlBtn.classList.toggle('on', !!(wrap && wrap.tagName === 'MARK'));
+  if (clBtn) clBtn.classList.toggle('on', !!(wrap && wrap.tagName === 'SPAN'));
 }
 function ntSaveSelection(){
   var sel = window.getSelection();
@@ -6041,17 +6068,20 @@ function ntCmd(cmd, val){
   ntUpdateEmptyState();
   ntScheduleSave();
   ntUpdateToolbarState();
+  ntKeepCaretVisible();
 }
 function ntHeading(level){
   ntFocusBody();
   document.execCommand('formatBlock', false, 'H'+level);
   ntScheduleSave();
   ntUpdateToolbarState();
+  ntKeepCaretVisible();
 }
 function ntInsertList(kind){
   ntFocusBody();
   document.execCommand(kind==='ol' ? 'insertOrderedList' : 'insertUnorderedList', false, null);
   ntScheduleSave();
+  ntKeepCaretVisible();
 }
 function ntInsertTodo(){
   ntFocusBody();
@@ -6115,7 +6145,7 @@ function ntSwatchBg(cls){
 }
 function ntWrapSelection(tag, cls){
   var sel = window.getSelection();
-  if (!sel || !sel.rangeCount || sel.isCollapsed) { showToast('Pilih (seleksi) teks dulu','i'); return; }
+  if (!sel || !sel.rangeCount || sel.isCollapsed) { showToast('Pilih (seleksi) teks dulu','i'); return false; }
   var range = sel.getRangeAt(0);
   var el = document.createElement(tag);
   if (cls) el.className = cls;
@@ -6124,17 +6154,59 @@ function ntWrapSelection(tag, cls){
   sel.removeAllRanges();
   var r2 = document.createRange(); r2.selectNodeContents(el); r2.collapse(false);
   sel.addRange(r2);
+  return el;
+}
+/* Elemen pembungkus (mark/span berwarna) yang sedang berisi kursor.
+   Dipakai untuk mendeteksi format aktif sehingga tap ulang bisa MEMATIKAN. */
+function ntActiveWrapEl(){
+  var sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  var node = sel.getRangeAt(0).startContainer;
+  var el = node && node.nodeType === 3 ? node.parentElement : node;
+  var body = document.getElementById('nt-body');
+  while (el && el !== body) {
+    if (el.tagName === 'MARK' || (el.tagName === 'SPAN' && /(^|\s)c-[a-z](\s|$)/.test(el.className))) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+function ntClearWrap(){
+  var el = ntActiveWrapEl();
+  if (!el || !el.parentNode) return;
+  var parent = el.parentNode;
+  while (el.firstChild) parent.insertBefore(el.firstChild, el);
+  parent.removeChild(el);
+}
+/* Sisipkan stabilo/warna: kalau teks yang dipilih/kursor SUDAH punya format
+   yang sama, maka matikan (toggle off). Kalau tidak, terapkan. */
+function ntToggleWrap(tag, cls, jenis){
+  var aktif = ntActiveWrapEl();
+  if (aktif) {
+    var samaKelas = aktif.className === (cls || '') || (cls && aktif.classList.contains(cls));
+    var samaJenis = (tag === 'mark' && aktif.tagName === 'MARK') || (tag === 'span' && aktif.tagName === 'SPAN');
+    // Tap pada warna/format yang sama ATAU tap "Hapus" => matikan.
+    if (!cls || (samaKelas && samaJenis)) {
+      ntClearWrap();
+      showToast(jenis + ' dimatikan', 'i');
+      return;
+    }
+  }
+  ntWrapSelection(tag, cls);
 }
 function ntApplyHighlight(cls){
   document.getElementById('nt-pal-highlight').classList.remove('open');
   ntFocusBody();
-  ntWrapSelection('mark', cls);
+  ntToggleWrap('mark', cls, 'Stabilo');
+  ntUpdateToolbarState();
+  ntKeepCaretVisible();
   ntScheduleSave();
 }
 function ntApplyTextColor(cls){
   document.getElementById('nt-pal-color').classList.remove('open');
   ntFocusBody();
-  ntWrapSelection('span', cls);
+  ntToggleWrap('span', cls, 'Warna teks');
+  ntUpdateToolbarState();
+  ntKeepCaretVisible();
   ntScheduleSave();
 }
 
