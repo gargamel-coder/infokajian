@@ -5605,14 +5605,68 @@ function ntCleanNode(src, dst, doc){
     if (n.nodeType !== 1) continue;
     var tag = n.tagName.toUpperCase();
     if (NT_DROP_WITH_CONTENT[tag]) continue;
+
+    // LANGKAH 4: pertahankan stabilo & warna teks.
+    // execCommand menghasilkan <span style="background-color: rgb(...)"> dan
+    // <font color="#...">. Sebelumnya tag style/atribut ini dibuang sehingga
+    // stabilo & warna HILANG saat catatan disimpan lalu dibuka lagi.
+    // Sekarang dikonversi ke class h-*/c-* yang memang diizinkan.
+    if (tag === 'SPAN' || tag === 'FONT') {
+      var clsDariWarna = ntClassDariWarna(n, tag);
+      if (clsDariWarna) {
+        var sp = doc.createElement('span');
+        sp.setAttribute('class', clsDariWarna);
+        ntCleanNode(n, sp, doc);
+        dst.appendChild(sp);
+        continue;
+      }
+    }
+
     if (!NT_ALLOWED_TAGS[tag]) { ntCleanNode(n, dst, doc); continue; }   // buang tag, simpan isinya
     var el = doc.createElement(tag.toLowerCase());
     var cls = (n.getAttribute('class') || '').split(/\s+/).filter(function(c){ return NT_ALLOWED_CLASS.test(c); });
     if (cls.length) el.setAttribute('class', cls.join(' '));
-    if (tag === 'UL' || tag === 'DIV' || tag === 'LI' || tag === 'SPAN') { /* hanya class aman */ }
     ntCleanNode(n, el, doc);
     dst.appendChild(el);
   }
+}
+/* Normalisasi warna apa pun (rgb(), #rgb, #rrggbb, nama) ke HURUF BESAR hex
+   '#RRGGBB' supaya bisa dibandingkan dengan NT_HL_HEX / NT_TXT_HEX. */
+function ntNormalisasiHex(w){
+  if (!w) return null;
+  w = String(w).trim().toLowerCase();
+  var m = w.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (m) {
+    return '#' + [m[1], m[2], m[3]].map(function(v){
+      var h = parseInt(v,10).toString(16).toUpperCase();
+      return h.length === 1 ? '0'+h : h;
+    }).join('');
+  }
+  m = w.match(/^#([0-9a-f]{3})$/);
+  if (m) return '#' + m[1].split('').map(function(c){ return (c+c).toUpperCase(); }).join('');
+  m = w.match(/^#([0-9a-f]{6})$/);
+  if (m) return '#' + m[1].toUpperCase();
+  return null;
+}
+/* Tentukan class h-* (stabilo) atau c-* (warna teks) dari atribut style/color. */
+function ntClassDariWarna(el, tag){
+  var warna = null, jenis = null;
+  if (tag === 'FONT') {
+    warna = el.getAttribute('color'); jenis = 'c';
+  } else {
+    var st = (el.getAttribute('style') || '');
+    var mb = st.match(/background-color\s*:\s*([^;]+)/i);
+    var mc = st.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+    if (mb) { warna = mb[1]; jenis = 'h'; }
+    else if (mc) { warna = mc[1]; jenis = 'c'; }
+  }
+  var hex = ntNormalisasiHex(warna);
+  if (!hex) return null;
+  var peta = (jenis === 'h') ? NT_HL_HEX : NT_TXT_HEX;
+  for (var cls in peta) {
+    if (ntNormalisasiHex(peta[cls]) === hex) return cls;
+  }
+  return null;
 }
 function ntSanitizeHTML(html){
   if (!html) return '';
@@ -5824,6 +5878,12 @@ function ntOpenEditorFor(note){
   ntSetStatus('ok');
   _ntSavedRange = null;
   _ntWrapMode = null;   // mode stabilo/warna tidak boleh terbawa ke catatan lain
+  // LANGKAH 2: reset semua mode format saat membuka catatan, supaya indikator
+  // tombol tidak menyala sisa dari catatan sebelumnya.
+  _ntInlineMode.bold = false;
+  _ntInlineMode.italic = false;
+  _ntInlineMode.underline = false;
+  _ntInlineMode.strikeThrough = false;
   ntUpdateToolbarState();
   setTimeout(function(){ document.getElementById('nt-scroll').scrollTop = 0; }, 30);
 }
@@ -6042,19 +6102,30 @@ function ntKeepCaretVisible(){
 }
 /* ---------- Indikator format aktif (nyala saat kursor di teks berformat) ---------- */
 var NT_STATE_BTNS = [
-  {cmd:'bold', sel:"[onclick=\"ntCmd('bold')\"]"},
-  {cmd:'italic', sel:"[onclick=\"ntCmd('italic')\"]"},
-  {cmd:'underline', sel:"[onclick=\"ntCmd('underline')\"]"},
-  {cmd:'strikeThrough', sel:"[onclick=\"ntCmd('strikeThrough')\"]"},
+  // LANGKAH 3: bold & italic memakai queryCommandState (akurat di semua
+  // browser); underline & strikethrough memakai ntCaretInFormat karena
+  // queryCommandState TIDAK akurat untuk keduanya di WebKit.
+  {cmd:'bold', sel:"[onclick=\"ntCmd('bold')\"]", pakaiQuery:true},
+  {cmd:'italic', sel:"[onclick=\"ntCmd('italic')\"]", pakaiQuery:true},
+  {cmd:'underline', sel:"[onclick=\"ntCmd('underline')\"]", pakaiQuery:false},
+  {cmd:'strikeThrough', sel:"[onclick=\"ntCmd('strikeThrough')\"]", pakaiQuery:false}
 ];
 function ntUpdateToolbarState(){
   NT_STATE_BTNS.forEach(function(b){
     var el = document.querySelector('.nt-bar-row '+b.sel);
     if (!el) return;
-    // Indikator mengikuti MODE yang dilacak. Sengaja TIDAK memakai deteksi
-    // "kursor di teks berformat lama", karena setelah klik kedua tombol akan
-    // tampak masih menyala (membingungkan) walau mode sudah dimatikan.
-    el.classList.toggle('on', !!_ntInlineMode[b.cmd]);
+    // LANGKAH 3: indikator = MODE yang dilacak ATAU kursor berada di teks
+    // berformat. bold/italic pakai queryCommandState; underline/strike pakai
+    // deteksi tag sendiri (queryCommandState tidak akurat di WebKit).
+    var onMode = !!_ntInlineMode[b.cmd];
+    var diTeks = false;
+    if (b.pakaiQuery) {
+      try { diTeks = document.queryCommandState(b.cmd); } catch(e) { diTeks = false; }
+      if (!diTeks) diTeks = ntCaretInFormat(b.cmd);
+    } else {
+      diTeks = ntCaretInFormat(b.cmd);
+    }
+    el.classList.toggle('on', onMode || diTeks);
   });
   // Heading & blockquote: cek elemen induk dari node kursor.
   var sel = window.getSelection();
@@ -6103,34 +6174,54 @@ function ntRestoreSelection(range){
    Deklarasi WAJIB di sini (sebelum dipakai) supaya tidak bergantung hoisting. */
 var _ntApplyingFormat = false;
 
+/* LANGKAH 1: cegah toolbar merebut fokus dari editor.
+   Tombol .nt-b adalah <div>. Di HP, menyentuh toolbar memindahkan fokus
+   sehingga SELEKSI di editor hilang sebelum onclick jalan -- akibatnya format
+   diterapkan pada posisi yang salah atau tidak sama sekali.
+   preventDefault() pada mousedown menjaga fokus & seleksi tetap di editor.
+   Dikecualikan: target yang memang butuh fokus (input/textarea) dan saat
+   komposisi IME (e.isComposing). */
+document.addEventListener('mousedown', function(e){
+  if (e.isComposing) return;
+  var t = e.target;
+  if (!t || !t.closest) return;
+  if (t.closest('.nt-bar')) {
+    if (t.closest('input, textarea')) return;
+    e.preventDefault();   // jangan rebut fokus dari editor
+  }
+}, true);
+
 function ntCmd(cmd, val){
-  // Pelindung: klik tombol memicu execCommand -> event 'input' -> handler input
-  // menjalankan ntApplyInlineMode() lagi saat kita masih di tengah proses klik.
-  // Tanpa flag ini, urutannya berputar tanpa henti (RangeError: Maximum call
-  // stack size exceeded) dan seluruh editor ikut mati.
+  // Pelindung: klik tombol memicu execCommand -> event 'input'.
+  // Tanpa flag ini, handler input menjalankan ntApplyInlineMode() lagi saat
+  // kita masih di tengah proses klik (sumber rekursi tak terbatas).
   if (_ntApplyingFormat) return;
   _ntApplyingFormat = true;
   try {
-    // Tombol = MODE MENULIS.
-    //   - Belum aktif -> aktifkan (teks berikutnya berformat).
-    //   - Sudah aktif -> matikan mode. Teks yang SUDAH ditulis DIBIARKAN.
-    var aktif = !!_ntInlineMode[cmd];
-    if (aktif) {
-      _ntInlineMode[cmd] = false;
-      try { document.execCommand(cmd, false, null); } catch(e) {}
-      showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
-    } else {
-      _ntInlineMode[cmd] = true;
-      try { document.execCommand(cmd, false, val || null); } catch(e) {}
-      showToast('Mode ' + NT_CMD_LABEL[cmd] + ' aktif', 'i');
-    }
-    ntUpdateEmptyState();
-    ntScheduleSave();
-    ntUpdateToolbarState();
-    ntKeepCaretVisible();
+    ntCmdInner(cmd, val);
   } finally {
     _ntApplyingFormat = false;
   }
+}
+function ntCmdInner(cmd, val){
+  ntFocusBody();
+  // Tombol = MODE MENULIS.
+  //   - Belum aktif -> aktifkan (teks berikutnya berformat).
+  //   - Sudah aktif -> matikan mode. Teks yang SUDAH ditulis DIBIARKAN.
+  var aktif = !!_ntInlineMode[cmd];
+  if (aktif) {
+    _ntInlineMode[cmd] = false;
+    try { document.execCommand(cmd, false, null); } catch(e) {}
+    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' dimatikan — teks yang sudah ada dibiarkan', 'i');
+  } else {
+    _ntInlineMode[cmd] = true;
+    try { document.execCommand(cmd, false, null); } catch(e) {}
+    showToast('Mode ' + NT_CMD_LABEL[cmd] + ' aktif', 'i');
+  }
+  ntUpdateEmptyState();
+  ntScheduleSave();
+  ntUpdateToolbarState();
+  ntKeepCaretVisible();
 }
 var _ntInlineMode = {bold:false, italic:false, underline:false, strikeThrough:false};
 var NT_CMD_LABEL = {bold:'Tebal', italic:'Miring', underline:'Garis bawah', strikeThrough:'Coret'};
@@ -6167,82 +6258,11 @@ function ntCaretInFormat(cmd){
   while (el && el !== body) { if (ntTagDariEl(el, cmd)) return true; el = el.parentElement; }
   return false;
 }
-/* Dipanggil saat pengguna mengetik: pastikan format teks baru SESUAI mode.
-
-   ⚠️ REKURSI TAK TERBATAS (bug nyata, line ~6177):
-   Fungsi ini dipanggil dari handler 'input' editor. Di dalamnya ada
-   document.execCommand(...) -- dan execCommand MEMICU event 'input' LAGI.
-   Tanpa pelindung, urutannya berputar:
-     input -> ntApplyInlineMode -> execCommand -> input -> ntApplyInlineMode -> ...
-   Itu penyebab "RangeError: Maximum call stack size exceeded" yang muncul
-   bertubi-tubi, sekaligus membuat tombol format dan pengetikan mati total
-   (browser kehabisan stack, semua handler berikutnya gagal jalan).
-
-   Pelindung: flag _ntApplyingFormat (dideklarasikan di atas, sebelum ntCmd).
-   Selama kita sedang menerapkan format, handler 'input' yang terpicu oleh
-   execCommand akan diabaikan (return cepat). Pelindung dilepas dengan
-   try/finally supaya tidak "nyangkut" kalau error. */
-function ntApplyInlineMode(){
-  if (_ntApplyingFormat) return;        // <-- pelindung anti-rekursi
-  var body = document.getElementById('nt-body');
-  if (!body) return;
-  var sel = window.getSelection();
-  if (!sel || !sel.rangeCount || !body.contains(sel.anchorNode)) return;
-  _ntApplyingFormat = true;
-  try {
-    for (var cmd in _ntInlineMode) {
-      var mau = _ntInlineMode[cmd];
-      var sudah = ntCaretInFormat(cmd);
-      if (mau === sudah) continue;      // nilai sudah sesuai: jangan sentuh DOM
-      var r = sel.getRangeAt(0).cloneRange();
-      document.execCommand(cmd, false, null);
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }
-  } finally {
-    _ntApplyingFormat = false;
-  }
-}
 /* Lepas format inline pada teks yang DIPILIH pengguna secara eksplisit.
    Sengaja TIDAK dipakai oleh ntCmd: klik tombol format tidak boleh mengubah
    teks lama. Disiapkan untuk aksi eksplisit seperti "Hapus format" di menu. */
 var NT_INLINE_TAGS = {bold:['B','STRONG'], italic:['I','EM'], underline:['U'], strikeThrough:['S','STRIKE','DEL']};
-function ntClearInlineFormat(cmd){
-  var tags = NT_INLINE_TAGS[cmd];
-  if (!tags) { document.execCommand(cmd, false, null); return; }
-  var sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  var range = sel.getRangeAt(0);
-  var body = document.getElementById('nt-body');
-  // Tentukan cakupan: kalau ada teks tersorot pakai sorotan itu, kalau tidak
-  // pakai seluruh ISI dari elemen pembungkus tempat kursor berada.
-  var scope = null;
-  if (!range.collapsed) {
-    scope = range.cloneRange();
-  } else {
-    var node = range.startContainer;
-    var el = node.nodeType === 3 ? node.parentElement : node;
-    while (el && el !== body && tags.indexOf(el.tagName) === -1) el = el.parentElement;
-    if (el && el !== body) { scope = document.createRange(); scope.selectNodeContents(el); }
-  }
-  if (!scope) return;
-  // Kumpulkan semua elemen format yang berada di dalam cakupan.
-  var dalamCakupan = [];
-  var walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
-  var n;
-  while ((n = walker.nextNode())) {
-    if (tags.indexOf(n.tagName) > -1 && scope.intersectsNode(n)) dalamCakupan.push(n);
-  }
-  // Lepas pembungkusnya, teks tetap utuh.
-  dalamCakupan.forEach(function(el){
-    if (!el.parentNode) return;
-    var parent = el.parentNode;
-    while (el.firstChild) parent.insertBefore(el.firstChild, el);
-    parent.removeChild(el);
-  });
-  // Normalisasi tag sisa supaya tidak bersarang ganda.
-  try { body.normalize(); } catch(e) {}
-}
+
 function ntHeading(level){
   ntFocusBody();
   // Konsisten dengan tombol format lain: klik hanya memilih gaya blok untuk
@@ -6254,15 +6274,7 @@ function ntHeading(level){
   ntUpdateToolbarState();
   ntKeepCaretVisible();
 }
-/* Apakah blok tempat kursor berada bertipe tag tertentu (mis. H1/H2/BLOCKQUOTE)? */
-function ntBlockIs(tag){
-  var sel = window.getSelection();
-  if (!sel || !sel.anchorNode) return false;
-  var el = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
-  var body = document.getElementById('nt-body');
-  while (el && el !== body) { if (el.tagName === tag) return true; el = el.parentElement; }
-  return false;
-}
+
 /* Hapus format pada teks yang DISOROT pengguna (aksi eksplisit dari menu).
    Berbeda dengan tombol toolbar: ini memang bertujuan mengubah teks lama. */
 function ntClearFormatSelection(){
@@ -6281,8 +6293,11 @@ function ntClearFormatSelection(){
   var n;
   while ((n = walker.nextNode())) {
     var tagOk = semuaTag.indexOf(n.tagName) > -1;
-    var warnaOk = n.tagName === 'SPAN' && /(^|\s)c-[a-z](\s|$)/.test(n.className);
-    if ((tagOk || warnaOk) && scope.intersectsNode(n)) kumpulan.push(n);
+    // LANGKAH 4 (samakan): span berwarna bisa berupa class c-*/h-* (hasil
+    // simpan) ATAU style/color langsung (baru dibuat, belum disimpan).
+    var warnaOk = n.tagName === 'SPAN' && (/(^|\s)[ch]-[a-z](\s|$)/.test(n.className) || !!ntClassDariWarna(n,'SPAN'));
+    var fontOk = n.tagName === 'FONT' && !!ntClassDariWarna(n,'FONT');
+    if ((tagOk || warnaOk || fontOk) && scope.intersectsNode(n)) kumpulan.push(n);
   }
   kumpulan.forEach(function(el){
     if (!el.parentNode) return;
@@ -6364,19 +6379,7 @@ function ntSwatchBg(cls){
     'c-r':'#C62828','c-b':'#1565C0','c-g':'#2E7D32','c-o':'#D9730D','c-v':'#6A3FB5','c-m':'#7A8F83'};
   return map[cls] || '#fff';
 }
-function ntWrapSelection(tag, cls){
-  var sel = window.getSelection();
-  if (!sel || !sel.rangeCount || sel.isCollapsed) { showToast('Pilih (seleksi) teks dulu','i'); return false; }
-  var range = sel.getRangeAt(0);
-  var el = document.createElement(tag);
-  if (cls) el.className = cls;
-  el.appendChild(range.extractContents());
-  range.insertNode(el);
-  sel.removeAllRanges();
-  var r2 = document.createRange(); r2.selectNodeContents(el); r2.collapse(false);
-  sel.addRange(r2);
-  return el;
-}
+
 /* ---------- Stabilo & warna teks = MODE MENULIS (pakai execCommand) ----------
    Disimpan sebagai mode: pilih warna -> warna itu dipakai untuk ketikan
    berikutnya; pilih "Hapus" atau warna yang sama -> mode mati, teks yang
@@ -6526,10 +6529,15 @@ function ntRemoveSlashTrigger(){
   } catch(e) { /* abaikan */ }
 }
 function ntHandleBodyInput(e){
+  // LANGKAH 3: JANGAN menerapkan format dari handler 'input'. execCommand di
+  // dalam handler input memicu event 'input' lagi -> rekursi tak terbatas
+  // (RangeError: Maximum call stack size exceeded) dan seluruh editor mati.
+  // Format saat mengetik ditangani execCommand di ntCmd() (state pengetikan
+  // browser), jadi tidak perlu intervensi di sini.
+  // Lewati juga saat IME sedang menyusun karakter (e.isComposing).
+  if (e && e.isComposing) return;
   ntUpdateEmptyState();
   ntScheduleSave();
-  // Pastikan format teks baru sesuai mode tombol (ini penentu "klik 2 = off").
-  ntApplyInlineMode();
   // Deteksi '/' di awal baris / setelah spasi untuk memicu slash menu.
   var sel = window.getSelection();
   if (!sel || !sel.rangeCount || !sel.isCollapsed) { ntHideSlash(); return; }
