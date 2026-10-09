@@ -2017,7 +2017,9 @@ function stopUserDataListener() {
 // ══════════════════════════════════════════
 const today = () => new Date().toISOString().split('T')[0];
 const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
-const T = today();
+// T dihitung langsung via today() di titik penggunaan, BUKAN konstanta saat load:
+// PWA bisa dibiarkan terbuka lintas hari, sehingga konstanta T basi membuat
+// kajian yang sudah lewat tetap lolos filter "Kajian Terdekat".
 
 const DB = {
   // Katalog hanya diisi data Firestore, tidak pernah data contoh.
@@ -2586,7 +2588,7 @@ function ikFmt(m){ m=((Math.round(m)%1440)+1440)%1440; const h=Math.floor(m/60),
 function ik2(n){ return (n<10?'0':'')+n; }
 
 // Penanda salat selesai per hari (localStorage)
-function ikDoneKey(){ return 'ik_done_' + T; }
+function ikDoneKey(){ return 'ik_done_' + today(); }
 function ikGetDone(){ try{ return JSON.parse(localStorage.getItem(ikDoneKey())||'[]'); }catch(e){ return []; } }
 function ikSetDone(a){ try{ localStorage.setItem(ikDoneKey(), JSON.stringify(a)); }catch(e){} }
 
@@ -2608,7 +2610,7 @@ function ikTick(){
   const c=document.getElementById('ik-clock');
   if(c) c.textContent = ik2(now.getHours())+':'+ik2(now.getMinutes());
   const hd=document.getElementById('ik-hdate');
-  if(hd) hd.textContent = fmtDateLong(T) + ' · ' + fmtHijri(T);
+  if(hd) hd.textContent = fmtDateLong(today()) + ' · ' + fmtHijri(today());
 
   const nx=ikNext(), nextIdx=nx.idx;
   const nextMin = ikMin(IK_TIMES[nextIdx]) + (nx.wrap?1440:0);
@@ -2810,7 +2812,8 @@ function renderHome() {
   const searchResults = document.getElementById('home-search-results');
   if(searchResults && !state.user) searchResults.style.display = 'none';
 
-  // Nearby kajian — exclude past kajian (date < today)
+  // Exclude past kajian (date < today, dihitung fresh agar PWA lintas hari tetap benar)
+  const T=today();
   const vis = DB.kajian.filter(k => k.status !== 'pending' && k.date >= T);
   let list;
   if (state.location) {
@@ -3023,7 +3026,7 @@ function renderKajianList() {
   let list = DB.kajian.filter(k=>{
     if(k.status==='pending' && !isAdmin) return false;
     // Hanya tampilkan kajian yang belum lewat (kecuali admin memfilter tanggal tertentu)
-    if(!state.kajianDate && k.date && k.date < T) return false;
+    if(!state.kajianDate && k.date && k.date < today()) return false;
     var spkF=getSpeaker(k.speaker_id); if(q && !(spkF&&spkF.full_name.toLowerCase().includes(q.toLowerCase())) && !k.title.toLowerCase().includes(q.toLowerCase())) return false;
     if(state.kajianDate && k.date!==state.kajianDate) return false;
     if(state.kajianTopic && k.topic!==state.kajianTopic) return false;
@@ -3970,7 +3973,7 @@ function renderPrayer() {
   const KEYS  = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
   const locEl = document.getElementById('prayer-loc');
   const dateEl = document.getElementById('prayer-date');
-  if(dateEl) dateEl.textContent = fmtDateLong(T);
+  if(dateEl) dateEl.textContent = fmtDateLong(today());
   const content = document.getElementById('prayer-content');
   if(!content) return;
   if(!state.location && !state.locationError) {
@@ -4213,7 +4216,7 @@ function initSubmit() {
   const info = document.getElementById('sub-info');
   if(info) info.style.display = (subRole==='admin'||eid) ? 'none' : 'block';
   const dateEl = document.getElementById('sub-date');
-  if(dateEl) dateEl.min = T;
+  if(dateEl) dateEl.min = today();
   if(eid) {
     const k = DB.kajian.find(x=>x.id===eid);
     if(k) {
@@ -4331,7 +4334,7 @@ function doSubmit() {
   const source=srcEl?srcEl.value.trim():'';
   if(!title||!topic||!date||!time||!state.selectedSpeakerId||!state.selectedMosqueId){showToast('Isi semua field yang diperlukan','e');return;}
   // Fix 3: Prevent past date submission
-  if(date < T){showToast('Tidak bisa submit kajian dengan tanggal yang sudah berlalu','e');return;}
+  if(date < today()){showToast('Tidak bisa submit kajian dengan tanggal yang sudah berlalu','e');return;}
   const btn=document.getElementById('sub-btn-text');
   btn.innerHTML='<div class="spin" style="width:20px;height:20px;border-width:2px"></div>';
   setTimeout(()=>{
@@ -4994,7 +4997,7 @@ async function ikFinishGoogleLogin(user) {
     u = {
       id: uid, email: user.email || '',
       name: isAdm ? 'Syahlan Jailani' : (user.displayName || (user.email || '').split('@')[0]),
-      role: isAdm ? 'admin' : 'user', created_at: T, photo: user.photoURL || ''
+      role: isAdm ? 'admin' : 'user', created_at: today(), photo: user.photoURL || ''
     };
     await fsSet('users', uid, u);
   }
