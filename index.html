@@ -1804,7 +1804,7 @@ function _onFirebaseReady() {
             } else {
               // New user not yet in Firestore — create record
               var isAdm = user.email==='syahlanxzaelani@gmail.com';
-              u = {id:user.uid, email:user.email||'', name:isAdm?'Syahlan Jailani':(user.displayName||((user.email||'').split('@')[0])), role:isAdm?'admin':'user', created_at:T};
+              u = {id:user.uid, email:user.email||'', name:isAdm?'Syahlan Jailani':(user.displayName||((user.email||'').split('@')[0])), role:isAdm?'admin':'user', created_at:today()};
               if(!DB.users.find(function(x){return x.id===u.id;})) DB.users.push(u);
               await fsSet('users', user.uid, u);
             }
@@ -2015,8 +2015,14 @@ function stopUserDataListener() {
 // ══════════════════════════════════════════
 // DATA (fallback jika Firebase belum disetup)
 // ══════════════════════════════════════════
-const today = () => new Date().toISOString().split('T')[0];
-const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+// Pakai tanggal LOKAL (WIB), bukan UTC — toISOString() membuat "hari ini"
+// mundur sejak pukul 19:00 WIB, sehingga kajian hari itu yang sudah lewat
+// tetap lolos filter.
+const today = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+};
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
 // T dihitung langsung via today() di titik penggunaan, BUKAN konstanta saat load:
 // PWA bisa dibiarkan terbuka lintas hari, sehingga konstanta T basi membuat
 // kajian yang sudah lewat tetap lolos filter "Kajian Terdekat".
