@@ -3217,15 +3217,26 @@ function ikLoadFontCSS(cb){
 
 /* Bungkus teks berdasarkan LEBAR PIXEL sebenarnya. */
 function ikWrapPx(text, fs, weight, family, maxW, maxLines){
-  // Kata yang sendirian lebih lebar dari maxW harus dipotong paksa,
-  // kalau tidak teksnya meluber keluar margin poster.
+  // Kata yang sendirian lebih lebar dari maxW: pecah dulu di pemisah alami
+  // ( / - , .) — "Nabawiyah/Sahabat" harus jadi dua kata, bukan dipotong
+  // di tengah huruf jadi "Nabawiya h." Baru kalau MASIH lebih lebar,
+  // potong per huruf dengan tanda hubung di akhir baris.
   var words = [];
   String(text==null?'':text).split(/\s+/).filter(Boolean).forEach(function(w){
     if (ikMeasure(w, fs, weight, family) <= maxW){ words.push(w); return; }
+    // pecah di pemisah alami tanpa menghapusnya dari teks
+    var parts = w.match(/[^\/\-,.,]+[\/\-,.]?/g) || [w];
+    var okAll = parts.every(function(p){ return ikMeasure(p, fs, weight, family) <= maxW; });
+    if (okAll && parts.length > 1){ parts.forEach(function(p){ if(p) words.push(p); }); return; }
     var chunk = '';
     for (var ci=0; ci<w.length; ci++){
       var test = chunk + w[ci];
-      if (ikMeasure(test, fs, weight, family) > maxW && chunk){ words.push(chunk); chunk = w[ci]; }
+      if (ikMeasure(test, fs, weight, family) > maxW && chunk){
+        words.push(chunk + '-');
+        chunk = w[ci];
+        // '-' di sambungan sudah diwakili tanda hubung baris — jangan digandakan
+        if (chunk === '-' || chunk === ',') chunk = '';
+      }
       else chunk = test;
     }
     if (chunk) words.push(chunk);
