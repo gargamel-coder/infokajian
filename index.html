@@ -4442,13 +4442,12 @@ function notifyAdmin(message) {
   if (!db) return;
   const admins = DB.users.filter(u => u.role === 'admin');
   admins.forEach(admin => {
-    db.collection('userData').doc(admin.id).get().then(doc => {
-      const existing = (doc.exists && doc.data().notifications) ? doc.data().notifications : [];
-      existing.unshift({message, read: false, timestamp: new Date().toISOString()});
-      db.collection('userData').doc(admin.id).set(
-        { notifications: existing.slice(0, 50) }, { merge: true }
-      );
-    }).catch(e => console.warn('notifyAdmin error:', e));
+    // arrayUnion: tambah notif TANPA menimpa array lama — aman dari balapan
+    // read-modify-write yang dulu menghilangkan notifikasi (lihat fsSaveUserData).
+    db.collection('userData').doc(admin.id).set(
+      { notifications: firebase.firestore.FieldValue.arrayUnion({message, read: false, timestamp: new Date().toISOString()}) },
+      { merge: true }
+    ).catch(e => console.warn('notifyAdmin error:', e));
   });
 }
 
@@ -4487,13 +4486,11 @@ function notifyNewUser(nu) {
   };
 
   return Promise.all(admins.map(admin =>
-    db.collection('userData').doc(admin.id).get().then(doc => {
-      const existing = (doc.exists && doc.data().notifications) ? doc.data().notifications : [];
-      existing.unshift(notif);
-      return db.collection('userData').doc(admin.id).set(
-        { notifications: existing.slice(0, 50) }, { merge: true }
-      );
-    }).then(() => {
+    // arrayUnion: tambah notif TANPA menimpa array lama (anti balapan/hilang)
+    db.collection('userData').doc(admin.id).set(
+      { notifications: firebase.firestore.FieldValue.arrayUnion(notif) },
+      { merge: true }
+    ).then(() => {
       // Kirim push FCM ke admin bila helper _fcmSend tersedia (server/relay).
       // Fallback: notif masuk ke inbox admin dan muncul saat admin membuka app.
       if (typeof _fcmSend === 'function') return _fcmSend(fcmPayload).catch(e => console.warn('push admin error:', e));
@@ -4522,14 +4519,11 @@ function notifyContributor(kajian, status) {
     fsSaveUserData();
   } else if (db) {
     // Write notification directly to contributor's userData in Firestore
-    db.collection('userData').doc(kajian.submitted_by).get().then(doc => {
-      const existing = doc.exists && doc.data().notifications ? doc.data().notifications : [];
-      existing.unshift(notif);
-      db.collection('userData').doc(kajian.submitted_by).set(
-        { notifications: existing.slice(0, 50) },
-        { merge: true }
-      );
-    }).catch(e => console.warn('notifyContributor error:', e));
+    // arrayUnion: tambah TANPA menimpa array lama (anti balapan/hilang)
+    db.collection('userData').doc(kajian.submitted_by).set(
+      { notifications: firebase.firestore.FieldValue.arrayUnion(notif) },
+      { merge: true }
+    ).catch(e => console.warn('notifyContributor error:', e));
   }
 }
 
