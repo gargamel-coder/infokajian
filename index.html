@@ -1124,39 +1124,8 @@ function showBanner() {
            firebaseapp.com yang bermasalah di iOS/Safari. -->
       <div id="ik-gsi-holder" style="display:flex;justify-content:center;min-height:44px;margin-bottom:12px"></div>
       <p style="text-align:center;margin:-6px 0 12px"><a href="javascript:void(0)" onclick="ikShowLoginHelp()" style="font-size:12.5px;color:var(--muted);text-decoration:underline">Login gagal / tidak bisa masuk?</a></p>
-      <p style="font-size:12.5px;color:var(--muted);line-height:1.55;text-align:center;margin-bottom:14px">Cukup satu klik. Akun baru otomatis dibuat dari akun Google Anda.</p>
-
-      <!-- ══ LOGIN NOMOR HP (OTP SMS) ══ -->
-      <div style="display:flex;align-items:center;gap:10px;margin:4px 0 14px">
-        <div style="flex:1;height:1px;background:var(--border)"></div>
-        <span style="font-size:11.5px;color:var(--muted);font-weight:600">ATAU MASUK DENGAN NOMOR HP</span>
-        <div style="flex:1;height:1px;background:var(--border)"></div>
-      </div>
-      <!-- Langkah 1: masukkan nomor HP -->
-      <div id="ik-phone-step1">
-        <div class="field">
-          <label class="lbl">Nomor WhatsApp / HP</label>
-          <div style="display:flex;gap:8px">
-            <span style="display:flex;align-items:center;padding:0 12px;border:1.5px solid var(--border);border-radius:10px;font-weight:700;font-size:14px;color:var(--text);background:#fff">+62</span>
-            <input id="ik-phone-num" class="inp" type="tel" inputmode="numeric" placeholder="81234567890" style="flex:1"/>
-          </div>
-        </div>
-        <button id="ik-phone-btn" class="btn btn-p" style="width:100%;margin-top:2px" onclick="ikPhoneSendCode()">Kirim Kode Verifikasi</button>
-        <p style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5">Kode verifikasi dikirim via SMS. Tulis tanpa angka 0 di depan.</p>
-      </div>
-      <!-- Langkah 2: masukkan kode OTP -->
-      <div id="ik-phone-step2" style="display:none">
-        <div class="field">
-          <label class="lbl">Kode Verifikasi (6 digit)</label>
-          <input id="ik-phone-code" class="inp" type="tel" inputmode="numeric" placeholder="123456" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:8px;font-weight:700"/>
-        </div>
-        <button class="btn btn-p" style="width:100%" onclick="ikPhoneVerifyCode()">Verifikasi &amp; Masuk</button>
-        <p style="font-size:12.5px;color:var(--muted);text-align:center;margin-top:10px">
-          Nomor <b id="ik-phone-shown"></b> · <a href="javascript:void(0)" onclick="ikPhoneBack()" style="color:var(--acc);text-decoration:underline;font-weight:600">ganti nomor</a>
-        </p>
-      </div>
-
-      <button onclick="goScreen('home')" style="width:100%;text-align:center;color:var(--muted);font-size:14px;padding:10px;font-weight:500;margin-top:6px">Lanjut sebagai Tamu →</button>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.55;text-align:center;margin-bottom:12px">Cukup satu klik. Akun baru otomatis dibuat dari akun Google Anda.</p>
+      <button onclick="goScreen('home')" style="width:100%;text-align:center;color:var(--muted);font-size:14px;padding:10px;font-weight:500">Lanjut sebagai Tamu →</button>
     </div>
   </div>
 
@@ -2295,7 +2264,7 @@ function onScreenEnter(name) {
   if (name==='admin') renderAdmin();
   if (name==='contrib-dash') renderContribDash();
   if (name==='submit') initSubmit();
-  if (name==='login') { ikInitGoogleLogin(); ikPhoneBack(); }
+  if (name==='login') ikInitGoogleLogin();
   if (name==='subs') renderSubscriptions();
   if (name==='leaderboard') renderLeaderboard();
   if (name==='badges') renderBadges();
@@ -5230,127 +5199,6 @@ function ikShowLoginHelp() {
 
 /* Dipanggil saat layar login dibuka. */
 function ikInitGoogleLogin() { ikRenderGisButton(); }
-
-/* ══════════════════════════════════════════════════════════════
-   LOGIN NOMOR HP (Firebase Phone Auth — OTP SMS)
-
-   Firebase compat SDK: auth.signInWithPhoneNumber(nomorE164,
-   verifier) mengirim SMS lalu kembalikan confirmationResult;
-   .confirm(kode) menyelesaikan login. reCAPTCHA verifier HARUS
-   'invisible' dan wajib ada di DOM sebelum kirim. Untuk pengujian
-   di localhost, Firebase mengizinkan reCAPTCHA test (di production
-   perlu domain terdaftar di Authorized domains).
-   ══════════════════════════════════════════════════════════════ */
-// Catat hanya status dan pesan error endpoint OTP, bukan payload atau token.
-var _ikOtpNetworkError = null;
-(function(){
-  var originalFetch = window.fetch;
-  window.fetch = async function(input, options){
-    var response = await originalFetch.apply(this, arguments);
-    var url = new URL(typeof input === 'string' ? input : input.url, location.href);
-    if (url.hostname === 'identitytoolkit.googleapis.com' && url.pathname === '/v1/accounts:sendVerificationCode') {
-      _ikOtpNetworkError = null;
-      if (!response.ok) {
-        try {
-          var body = await response.clone().json();
-          var message = String(body.error && body.error.message || 'Respons tanpa pesan').replace(/\+?\d{8,}/g, '[disamarkan]').slice(0,500);
-          _ikOtpNetworkError = {status:response.status, message:message};
-          console.error('[OTP HTTP]', _ikOtpNetworkError);
-        } catch(ignore) { _ikOtpNetworkError = {status:response.status, message:'Respons bukan JSON'}; }
-      }
-    }
-    return response;
-  };
-})();
-var _ikPhoneConfirm = null;
-var _ikPhoneRcHolder = null;
-
-/* Normalisasi input Indonesia -> format E.164 (+62...).
-   Menerima: 0812..., 812..., +62812..., 62 812-3456-7890 dst. */
-function ikPhoneToE164(raw){
-  var d = String(raw||'').replace(/\D/g,'');
-  if (d.indexOf('0') === 0) d = d.slice(1);           // 0812 -> 812
-  if (d.indexOf('62') === 0) d = d.slice(2);          // 62812 -> 812
-  if (!d || d.length < 8 || d.length > 13) return null;
-  return '+62' + d;
-}
-
-/* reCAPTCHA verifier HARUS dibuat FRESH di elemen baru setiap kali
-   kirim kode. Memakai ulang elemen lama melempar
-   'reCAPTCHA has already been rendered in this element'. */
-async function ikPhoneRecaptcha(){
-  try { if (window.ikPhoneVerifier) { await window.ikPhoneVerifier.clear(); } } catch(e) {}
-  if (_ikPhoneRcHolder && _ikPhoneRcHolder.parentNode) _ikPhoneRcHolder.parentNode.removeChild(_ikPhoneRcHolder);
-  _ikPhoneRcHolder = document.createElement('div');
-  _ikPhoneRcHolder.style.cssText = 'position:fixed;bottom:-200px;left:8px;';
-  document.body.appendChild(_ikPhoneRcHolder);
-  var v = new firebase.auth.RecaptchaVerifier(_ikPhoneRcHolder, { size: 'invisible' });
-  window.ikPhoneVerifier = v;
-  try { await v.render(); } catch(e) { console.warn('rc render:', e); }
-  return v;
-}
-
-async function ikPhoneSendCode(){
-  var btn = document.getElementById('ik-phone-btn');
-  var e164 = ikPhoneToE164((document.getElementById('ik-phone-num')||{}).value);
-  if (!e164) { showToast('Nomor tidak valid. Contoh: 81234567890','e'); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Mengirim kode…'; }
-  try {
-    var verifier = await ikPhoneRecaptcha();
-    _ikPhoneConfirm = await auth.signInWithPhoneNumber(e164, verifier);
-    document.getElementById('ik-phone-step1').style.display = 'none';
-    document.getElementById('ik-phone-step2').style.display = 'block';
-    document.getElementById('ik-phone-shown').textContent = e164;
-    document.getElementById('ik-phone-code').value = '';
-    setTimeout(function(){ var c=document.getElementById('ik-phone-code'); if(c) c.focus(); }, 100);
-    showToast('Kode verifikasi dikirim ke ' + e164, 's');
-  } catch (e) {
-    // Jangan simpan nomor, OTP, token captcha, atau kredensial dalam log.
-    var errorCode = String(e && e.code || 'unknown');
-    var errorMessage = String(e && e.message || 'Kesalahan tanpa keterangan').replace(/\+?\d{8,}/g, '[disamarkan]');
-    console.error('[OTP kirim]', {code: errorCode, message: errorMessage});
-    var detail = document.getElementById('ik-phone-error');
-    if (!detail) {
-      detail = document.createElement('p');
-      detail.id = 'ik-phone-error';
-      detail.setAttribute('role', 'alert');
-      detail.style.cssText = 'margin-top:12px;color:var(--danger);font-size:12px;overflow-wrap:anywhere';
-      document.getElementById('ik-phone-step1').appendChild(detail);
-    }
-    detail.textContent = 'Pengiriman gagal [' + errorCode + ']: ' + errorMessage + (_ikOtpNetworkError ? ' | HTTP ' + _ikOtpNetworkError.status + ': ' + _ikOtpNetworkError.message : ' | Tidak ada respons error HTTP OTP yang tertangkap.');
-    var msg = 'Pengiriman gagal: ' + errorCode;
-    if (errorCode === 'auth/billing-not-enabled') msg = 'SMS memerlukan penagihan Firebase aktif. Sementara gunakan Google.';
-    if (String(e.code||'').indexOf('invalid-phone-number')>=0) msg = 'Format nomor salah. Contoh: 81234567890';
-    else if (String(e.code||'').indexOf('quota-exceeded')>=0) msg = 'Kuota SMS habis untuk hari ini. Silakan login dengan Google.';
-    else if (String(e.code||'').indexOf('too-many-requests')>=0) msg = 'Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.';
-    else if (String(e.code||'').indexOf('captcha')>=0) msg = 'Verifikasi keamanan gagal. Muat ulang halaman lalu coba lagi.';
-    else if (String(e.code||'').indexOf('app-not')>=0) msg = 'Phone Auth belum aktif untuk aplikasi ini. Hubungi admin.';
-    else if (String(e.code||'').indexOf('operation-not-allowed')>=0) msg = 'Phone Auth belum aktif untuk aplikasi ini. Hubungi admin.';
-    showToast(msg, 'e', 5000);
-  }
-  if (btn) { btn.disabled = false; btn.textContent = 'Kirim Kode Verifikasi'; }
-}
-
-async function ikPhoneVerifyCode(){
-  var code = (document.getElementById('ik-phone-code')||{}).value || '';
-  if (!/^\d{4,6}$/.test(code)) { showToast('Masukkan kode verifikasi yang dikirim via SMS','e'); return; }
-  if (!_ikPhoneConfirm) { ikPhoneBack(); showToast('Sesi kode kedaluwarsa. Minta kode baru.','e'); return; }
-  try {
-    var res = await _ikPhoneConfirm.confirm(code);
-    _ikPhoneConfirm = null;
-    await ikFinishGoogleLogin(res.user);   // alur penyelesaian sama dengan Google
-  } catch (e) {
-    console.warn('phone verify error:', e);
-    showToast('Kode salah atau kedaluwarsa. Periksa SMS lalu coba lagi.','e',5000);
-  }
-}
-
-function ikPhoneBack(){
-  document.getElementById('ik-phone-step2').style.display = 'none';
-  document.getElementById('ik-phone-step1').style.display = 'block';
-  _ikPhoneConfirm = null;
-  try { if (window.ikPhoneVerifier) { window.ikPhoneVerifier.clear(); window.ikPhoneVerifier = null; } } catch(e) {}
-}
 
 /* Dijalankan saat aplikasi siap. Alur GIS memakai callback (bukan
    redirect), jadi tidak ada hasil redirect yang perlu diselesaikan —
