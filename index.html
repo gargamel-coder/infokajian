@@ -2023,6 +2023,16 @@ const today = () => {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 };
 const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+/* Kajian belum lewat? Cek tanggal + jam (kajian hari ini yang jam mulainya
+   sudah terlewat dianggap lampau). Dipakai beranda & daftar kajian. */
+function isUpcomingKajian(k){
+  if(!k || !k.date) return true;
+  const T = today();
+  if(k.date > T) return true;
+  if(k.date < T) return false;
+  const now = new Date();
+  return ikMin(k.time) >= (now.getHours()*60 + now.getMinutes());
+}
 // T dihitung langsung via today() di titik penggunaan, BUKAN konstanta saat load:
 // PWA bisa dibiarkan terbuka lintas hari, sehingga konstanta T basi membuat
 // kajian yang sudah lewat tetap lolos filter "Kajian Terdekat".
@@ -2818,9 +2828,10 @@ function renderHome() {
   const searchResults = document.getElementById('home-search-results');
   if(searchResults && !state.user) searchResults.style.display = 'none';
 
-  // Exclude past kajian (date < today, dihitung fresh agar PWA lintas hari tetap benar)
+  // Exclude past kajian — per TANGGAL + JAM (kajian hari ini yang jamnya
+  // sudah lewat juga disembunyikan).
   const T=today();
-  const vis = DB.kajian.filter(k => k.status !== 'pending' && k.date >= T);
+  const vis = DB.kajian.filter(k => k.status !== 'pending' && isUpcomingKajian(k));
   let list;
   if (state.location) {
     list = vis.map(function(k){
@@ -3032,7 +3043,7 @@ function renderKajianList() {
   let list = DB.kajian.filter(k=>{
     if(k.status==='pending' && !isAdmin) return false;
     // Hanya tampilkan kajian yang belum lewat (kecuali admin memfilter tanggal tertentu)
-    if(!state.kajianDate && k.date && k.date < today()) return false;
+    if(!state.kajianDate && k.date && !isUpcomingKajian(k)) return false;
     var spkF=getSpeaker(k.speaker_id); if(q && !(spkF&&spkF.full_name.toLowerCase().includes(q.toLowerCase())) && !k.title.toLowerCase().includes(q.toLowerCase())) return false;
     if(state.kajianDate && k.date!==state.kajianDate) return false;
     if(state.kajianTopic && k.topic!==state.kajianTopic) return false;
