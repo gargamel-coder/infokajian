@@ -1953,28 +1953,31 @@ function startRealtimeListeners() {
 
   // NOTE: We skip fromCache snapshots to prevent stale Firestore cache from
   // overwriting DB right after an admin delete/write operation.
+  // arrOrder: urutan dokumen dalam snapshot dipertahankan agar admin dashboard
+  // bisa menampilkan item terbaru (terakhir masuk) di atas.
+  function withArrOrder(docs){ return docs.map(function(o,i){ o.arrOrder = docs.length - 1 - i; return o; }); }
   _collectionUnsubs.push(db.collection('speakers').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    applyPublicCatalog('speakers', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
+    applyPublicCatalog('speakers', withArrOrder(snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; })));
     debounceRefresh();
   }, function(err) { console.warn('speakers listener error:', err); }));
 
   _collectionUnsubs.push(db.collection('mosques').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    applyPublicCatalog('mosques', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
+    applyPublicCatalog('mosques', withArrOrder(snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; })));
     debounceRefresh();
   }, function(err) { console.warn('mosques listener error:', err); }));
 
   _collectionUnsubs.push(db.collection('kajian').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
-    applyPublicCatalog('kajian', snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }));
+    applyPublicCatalog('kajian', withArrOrder(snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; })));
     debounceRefresh();
   }, function(err) { console.warn('kajian listener error:', err); }));
 
   _collectionUnsubs.push(db.collection('users').onSnapshot(function(snap) {
     if (snap.metadata && snap.metadata.fromCache) return;
     var seen = {};
-    DB.users = snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; })
+    DB.users = withArrOrder(snap.docs.map(function(d) { var o = d.data(); o.id = d.id; return o; }))
       .filter(function(u) { if (seen[u.id]) return false; seen[u.id] = true; return true; });
     if (state.user) {
       var updated = DB.users.find(function(u) { return u.id === state.user.id; });
@@ -4686,6 +4689,19 @@ function _renderSubsList() {
 // ══════════════════════════════════════════
 // ADMIN
 // ══════════════════════════════════════════
+/* Urutan "terbaru dulu" untuk daftar admin. Sumber kebenaran: arrOrder yang
+   dipetakan dari urutan dokumen snapshot Firestore (dipasang di
+   startRealtimeListeners). Item lama tanpa arrOrder memakai id numerik
+   (Date.now) sebagai fallback. */
+function byNewest(a,b){
+  const ao=a.arrOrder,bo=b.arrOrder;
+  if(ao!=null&&bo!=null&&ao!==bo) return bo-ao;
+  if(ao!=null) return -1;
+  if(bo!=null) return 1;
+  const na=parseInt(String(a.id).replace(/^\D+/,''),10)||0;
+  const nb=parseInt(String(b.id).replace(/^\D+/,''),10)||0;
+  return nb-na;
+}
 function renderAdmin() {
   if(!state.user||state.user.role!=='admin') return;
   // Safety guards for all DB arrays
@@ -4725,17 +4741,17 @@ function setAdminTab(tab,btn) {
   if(!c)return;
   if(tab==='kajian'){
     const pend=DB.kajian.filter(k=>k.status==='pending');
-    c.innerHTML=(pend.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">⏳ Menunggu Review (${pend.length})</p>`+pend.map(k=>{const spk=getSpeaker(k.speaker_id),msq=getMosque(k.mosque_id);return`<div class="card" style="padding:14px;margin-bottom:10px"><p style="font-weight:700;font-size:14px;margin-bottom:4px">${k.title}</p><p style="font-size:12px;color:var(--muted);margin-bottom:10px">${(spk&&spk.full_name)||''} · ${(msq&&msq.name)||''} · ${fmtDateShort(k.date)}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-p btn-xs" onclick="adminApprove('${k.id}')">✓ Setujui</button><button class="btn btn-d btn-xs" onclick="adminReject('${k.id}')">✕ Tolak</button><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join(''):'')+`<p style="font-weight:700;font-size:14px;margin-bottom:10px;margin-top:${pend.length?16:0}px">Semua Kajian</p>`+DB.kajian.map(k=>{const spk=getSpeaker(k.speaker_id),sc=STATUS[k.status]||STATUS.pending;return`<div class="card" style="padding:12px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><div style="flex:1"><p style="font-weight:600;font-size:13px">${k.title}</p><p style="font-size:11px;color:var(--muted)">${(spk&&spk.full_name)||''} · ${fmtDateShort(k.date)}</p></div><span class="tag ${sc.cls}">${sc.label}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select onchange="adminSetStatus('${k.id}',this.value)" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:3px 6px;background:#fff;color:var(--text)">${Object.keys(STATUS).map(function(v){return '<option value="'+v+'" '+(k.status===v?'selected':'')+'>'+STATUS[v].label+'</option>';}).join('')}</select><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join('');
+    c.innerHTML=(pend.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">⏳ Menunggu Review (${pend.length})</p>`+pend.map(k=>{const spk=getSpeaker(k.speaker_id),msq=getMosque(k.mosque_id);return`<div class="card" style="padding:14px;margin-bottom:10px"><p style="font-weight:700;font-size:14px;margin-bottom:4px">${k.title}</p><p style="font-size:12px;color:var(--muted);margin-bottom:10px">${(spk&&spk.full_name)||''} · ${(msq&&msq.name)||''} · ${fmtDateShort(k.date)}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-p btn-xs" onclick="adminApprove('${k.id}')">✓ Setujui</button><button class="btn btn-d btn-xs" onclick="adminReject('${k.id}')">✕ Tolak</button><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join(''):'')+`<p style="font-weight:700;font-size:14px;margin-bottom:10px;margin-top:${pend.length?16:0}px">Semua Kajian</p>`+[...DB.kajian].sort(byNewest).map(k=>{const spk=getSpeaker(k.speaker_id),sc=STATUS[k.status]||STATUS.pending;return`<div class="card" style="padding:12px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><div style="flex:1"><p style="font-weight:600;font-size:13px">${k.title}</p><p style="font-size:11px;color:var(--muted)">${(spk&&spk.full_name)||''} · ${fmtDateShort(k.date)}</p></div><span class="tag ${sc.cls}">${sc.label}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select onchange="adminSetStatus('${k.id}',this.value)" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:3px 6px;background:#fff;color:var(--text)">${Object.keys(STATUS).map(function(v){return '<option value="'+v+'" '+(k.status===v?'selected':'')+'>'+STATUS[v].label+'</option>';}).join('')}</select><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join('');
   }
   if(tab==='speakers'){
     const unv=DB.speakers.filter(s=>!s.verified);
-    c.innerHTML=(unv.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">Belum Terverifikasi</p>`+unv.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${s.normalized_name}</p></div><button class="btn btn-p btn-xs" onclick="adminVerifySpk('${s.id}')">Verifikasi</button></div>`).join(''):'')+`<p style="font-weight:700;font-size:14px;margin:${unv.length?16:0}px 0 10px">Semua Pembicara (${DB.speakers.length})</p>`+DB.speakers.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${DB.kajian.filter(k=>k.speaker_id===s.id).length} kajian</p></div><span class="tag ${s.verified?'tag-g':'tag-x'}">${s.verified?'✓ Verified':'Belum'}</span><button onclick="confirmDelete('speaker','${s.id}','${encodeURIComponent(s.full_name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
+    c.innerHTML=(unv.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">Belum Terverifikasi</p>`+unv.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${s.normalized_name}</p></div><button class="btn btn-p btn-xs" onclick="adminVerifySpk('${s.id}')">Verifikasi</button></div>`).join(''):'')+`<p style="font-weight:700;font-size:14px;margin:${unv.length?16:0}px 0 10px">Semua Pembicara (${DB.speakers.length})</p>`+[...DB.speakers].sort(byNewest).map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${DB.kajian.filter(k=>k.speaker_id===s.id).length} kajian</p></div><span class="tag ${s.verified?'tag-g':'tag-x'}">${s.verified?'✓ Verified':'Belum'}</span><button onclick="confirmDelete('speaker','${s.id}','${encodeURIComponent(s.full_name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
   }
   if(tab==='mosques'){
-    c.innerHTML=DB.mosques.map(m=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${m.name}</p><p style="font-size:11px;color:var(--muted)">${m.city}</p></div>${!m.verified?`<button class="btn btn-p btn-xs" onclick="adminVerifyMq('${m.id}')">Verifikasi</button>`:`<span class="tag tag-g">✓</span>`}<button onclick="confirmDelete('mosque','${m.id}','${encodeURIComponent(m.name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
+    c.innerHTML=[...DB.mosques].sort(byNewest).map(m=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${m.name}</p><p style="font-size:11px;color:var(--muted)">${m.city}</p></div>${!m.verified?`<button class="btn btn-p btn-xs" onclick="adminVerifyMq('${m.id}')">Verifikasi</button>`:`<span class="tag tag-g">✓</span>`}<button onclick="confirmDelete('mosque','${m.id}','${encodeURIComponent(m.name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
   }
   if(tab==='users'){
-    var safeUsers = Array.isArray(DB.users) ? DB.users : [];
+    var safeUsers = Array.isArray(DB.users) ? [...DB.users].sort(byNewest) : [];
     c.innerHTML=`<p style="font-weight:700;font-size:14px;margin-bottom:10px">Daftar Pengguna (${safeUsers.length})</p>`+(safeUsers.length===0?'<p style="font-size:13px;color:var(--muted);text-align:center;padding:24px 0">Belum ada pengguna terdaftar.</p>':safeUsers.map(u=>{
       const name = (u.name||u.email||'(tanpa nama)');
       const email = u.email||'-';
