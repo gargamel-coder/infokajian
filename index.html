@@ -1808,6 +1808,12 @@ function _onFirebaseReady() {
               u = {id:user.uid, email:user.email||'', name:isAdm?'Syahlan Jailani':(user.displayName||((user.email||'').split('@')[0])), role:isAdm?'admin':'user', created_at:today()};
               if(!DB.users.find(function(x){return x.id===u.id;})) DB.users.push(u);
               await fsSet('users', user.uid, u);
+              // Notifikasi admin: pengguna baru mendaftar (inbox admin + push).
+              if (!isAdm) {
+                try {
+                  notifyNewUser({uid:user.uid, name:u.name, email:u.email, timestamp:new Date().toISOString()});
+                } catch(e) { console.warn('notifyNewUser error:', e); }
+              }
             }
           } catch(e) { console.warn('onAuthStateChanged user fetch error:', e); }
         }
@@ -4426,6 +4432,55 @@ function notifyAdmin(message) {
       );
     }).catch(e => console.warn('notifyAdmin error:', e));
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ADMIN NOTIF: PENDAFTARAN PENGGUNA BARU
+   Dipanggil dari onAuthStateChanged ketika dokumen user baru dibuat.
+   Tanpa sesi admin aktif, klien menulis ke userData admin (diizinkan
+   rules: owner-only untuk admin sendiri) dan menyiapkan payload FCM
+   melalui _fcmSend jika tersedia (mis. saat backend/relay tersedia).
+   Tidak mengirim push FCM langsung dari klien — FCM HTTP API butuh
+   kredensial server dan tidak boleh diekspos di sisi klien.
+   ══════════════════════════════════════════════════════════════════════ */
+function notifyNewUser(nu) {
+  if (!nu || !nu.uid) return Promise.resolve();
+  const name = String(nu.name || '').slice(0, 80) || 'Pengguna';
+  const email = String(nu.email || '').slice(0, 120);
+  const message = 'Pengguna baru mendaftar: ' + name + (email ? ' (' + email + ')' : '') + '.';
+  const timestamp = nu.timestamp || new Date().toISOString();
+
+  // Admin sedang aktif di sesi ini: masuk inbox lokal saja.
+  if (state.user && state.user.role === 'admin') {
+    state.notifications.unshift({message, read: false, timestamp, type: 'new_user'});
+    fsSaveUserData();
+    return Promise.resolve();
+  }
+
+  if (!db) return Promise.resolve();
+  const admins = DB.users.filter(u => u.role === 'admin');
+  if (!admins.length) return Promise.resolve();
+
+  const notif = {message, read: false, timestamp, type: 'new_user'};
+  const fcmPayload = {
+    title: 'Pendaftaran baru',
+    body : name + (email ? ' (' + email + ')' : '') + ' baru mendaftar di Info Kajian.',
+    link : 'https://www.infokajian.app/#/admin'
+  };
+
+  return Promise.all(admins.map(admin =>
+    db.collection('userData').doc(admin.id).get().then(doc => {
+      const existing = (doc.exists && doc.data().notifications) ? doc.data().notifications : [];
+      existing.unshift(notif);
+      return db.collection('userData').doc(admin.id).set(
+        { notifications: existing.slice(0, 50) }, { merge: true }
+      );
+    }).then(() => {
+      // Kirim push FCM ke admin bila helper _fcmSend tersedia (server/relay).
+      // Fallback: notif masuk ke inbox admin dan muncul saat admin membuka app.
+      if (typeof _fcmSend === 'function') return _fcmSend(fcmPayload).catch(e => console.warn('push admin error:', e));
+    }).catch(e => console.warn('notifyNewUser error:', e))
+  )).then(() => {});
 }
 
 // FEATURE 3: Notify contributor when their kajian is approved or rejected
