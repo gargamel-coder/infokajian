@@ -5242,6 +5242,7 @@ function ikInitGoogleLogin() { ikRenderGisButton(); }
    perlu domain terdaftar di Authorized domains).
    ══════════════════════════════════════════════════════════════ */
 var _ikPhoneConfirm = null;
+var _ikPhoneRcHolder = null;
 
 /* Normalisasi input Indonesia -> format E.164 (+62...).
    Menerima: 0812..., 812..., +62812..., 62 812-3456-7890 dst. */
@@ -5253,17 +5254,19 @@ function ikPhoneToE164(raw){
   return '+62' + d;
 }
 
-function ikPhoneRecaptcha(){
-  var holder = document.getElementById('ik-phone-recaptcha');
-  if (!holder) {
-    holder = document.createElement('div');
-    holder.id = 'ik-phone-recaptcha';
-    holder.style.cssText = 'position:fixed;bottom:-200px;left:8px;';
-    document.body.appendChild(holder);
-  }
-  try { if (window.ikPhoneVerifier) { ikPhoneVerifier.clear(); } } catch(e) {}
-  window.ikPhoneVerifier = new firebase.auth.RecaptchaVerifier(holder, { size: 'invisible' });
-  return window.ikPhoneVerifier;
+/* reCAPTCHA verifier HARUS dibuat FRESH di elemen baru setiap kali
+   kirim kode. Memakai ulang elemen lama melempar
+   'reCAPTCHA has already been rendered in this element'. */
+async function ikPhoneRecaptcha(){
+  try { if (window.ikPhoneVerifier) { await window.ikPhoneVerifier.clear(); } } catch(e) {}
+  if (_ikPhoneRcHolder && _ikPhoneRcHolder.parentNode) _ikPhoneRcHolder.parentNode.removeChild(_ikPhoneRcHolder);
+  _ikPhoneRcHolder = document.createElement('div');
+  _ikPhoneRcHolder.style.cssText = 'position:fixed;bottom:-200px;left:8px;';
+  document.body.appendChild(_ikPhoneRcHolder);
+  var v = new firebase.auth.RecaptchaVerifier(_ikPhoneRcHolder, { size: 'invisible' });
+  window.ikPhoneVerifier = v;
+  try { await v.render(); } catch(e) { console.warn('rc render:', e); }
+  return v;
 }
 
 async function ikPhoneSendCode(){
@@ -5272,7 +5275,7 @@ async function ikPhoneSendCode(){
   if (!e164) { showToast('Nomor tidak valid. Contoh: 81234567890','e'); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Mengirim kode…'; }
   try {
-    var verifier = ikPhoneRecaptcha();
+    var verifier = await ikPhoneRecaptcha();
     _ikPhoneConfirm = await auth.signInWithPhoneNumber(e164, verifier);
     document.getElementById('ik-phone-step1').style.display = 'none';
     document.getElementById('ik-phone-step2').style.display = 'block';
@@ -5286,7 +5289,9 @@ async function ikPhoneSendCode(){
     if (String(e.code||'').indexOf('invalid-phone-number')>=0) msg = 'Format nomor salah. Contoh: 81234567890';
     else if (String(e.code||'').indexOf('quota-exceeded')>=0) msg = 'Kuota SMS habis untuk hari ini. Silakan login dengan Google.';
     else if (String(e.code||'').indexOf('too-many-requests')>=0) msg = 'Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.';
-    else if (String(e.code||'').indexOf('captcha')>=0 || String(e.code||'').indexOf('app-not')>=0) msg = 'Verifikasi keamanan gagal. Muat ulang halaman lalu coba lagi.';
+    else if (String(e.code||'').indexOf('captcha')>=0) msg = 'Verifikasi keamanan gagal. Muat ulang halaman lalu coba lagi.';
+    else if (String(e.code||'').indexOf('app-not')>=0) msg = 'Phone Auth belum aktif untuk aplikasi ini. Hubungi admin.';
+    else if (String(e.code||'').indexOf('operation-not-allowed')>=0) msg = 'Phone Auth belum aktif untuk aplikasi ini. Hubungi admin.';
     showToast(msg, 'e', 5000);
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Kirim Kode Verifikasi'; }
@@ -5310,7 +5315,7 @@ function ikPhoneBack(){
   document.getElementById('ik-phone-step2').style.display = 'none';
   document.getElementById('ik-phone-step1').style.display = 'block';
   _ikPhoneConfirm = null;
-  try { if (window.ikPhoneVerifier) { ikPhoneVerifier.clear(); window.ikPhoneVerifier = null; } } catch(e) {}
+  try { if (window.ikPhoneVerifier) { window.ikPhoneVerifier.clear(); window.ikPhoneVerifier = null; } } catch(e) {}
 }
 
 /* Dijalankan saat aplikasi siap. Alur GIS memakai callback (bukan
