@@ -4329,7 +4329,7 @@ function confirmAddSpeaker() {
   const norm = normName(name);
   const ex = DB.speakers.find(s=>s.normalized_name===norm);
   if(ex){selectSpeaker(ex.id,ex.full_name);closeModal('modal-spk');showToast('Pembicara sudah ada, dipilih otomatis','i');return;}
-  const spk = {id:'s'+Date.now(),full_name:name,normalized_name:norm,verified:state.user&&state.user.role==='admin',created_by:(state.user&&state.user.id)||'u1'};
+  const spk = {id:'s'+Date.now(),full_name:name,normalized_name:norm,verified:state.user&&state.user.role==='admin',created_by:(state.user&&state.user.id)||'u1',created_ms:Date.now()};
   DB.speakers.push(spk);
   selectSpeaker(spk.id,spk.full_name);
   closeModal('modal-spk');
@@ -4373,7 +4373,7 @@ function confirmAddMosque() {
     lat:hasCoords?userLat:(-6.2+Math.random()*.2),
     lng:hasCoords?userLng:(106.8+Math.random()*.2),
     coordsPrecise:hasCoords,
-    normalized_name:name.toLowerCase(),verified:state.user&&state.user.role==='admin',created_by:(state.user&&state.user.id)||'u1'};
+    normalized_name:name.toLowerCase(),verified:state.user&&state.user.role==='admin',created_by:(state.user&&state.user.id)||'u1',created_ms:Date.now()};
   DB.mosques.push(msq);
   selectMosque(msq.id,msq.name);
   closeModal('modal-mq');
@@ -4404,7 +4404,7 @@ function doSubmit() {
       state.editKajianId=null;
       showToast('Kajian berhasil diperbarui! ✓','s');
     } else {
-      const k={id:'k'+Date.now(),title:title,topic:topic,speaker_id:state.selectedSpeakerId,mosque_id:state.selectedMosqueId,date:date,time:time,status:(state.user&&state.user.role==='admin')?'approved':'pending',description:desc,source:source,submitted_by:(state.user&&state.user.id)||'u1'};
+      const k={id:'k'+Date.now(),title:title,topic:topic,speaker_id:state.selectedSpeakerId,mosque_id:state.selectedMosqueId,date:date,time:time,status:(state.user&&state.user.role==='admin')?'approved':'pending',description:desc,source:source,submitted_by:(state.user&&state.user.id)||'u1',created_ms:Date.now()};
       DB.kajian.push(k);
       fsSet('kajian',k.id,k);      if(state.user&&state.user.role==='admin'){state.notifications.unshift({message:'Kajian "'+title+'" berhasil dipublikasikan!',read:false,timestamp:new Date().toISOString()});notifySubscribers(k);showToast('Kajian berhasil dipublikasikan!','s');}
       else { showToast('Kajian dikirim untuk review admin.','s'); notifyAdmin('Kajian baru "'+title+'" disubmit oleh '+((state.user&&state.user.name)||'kontributor')+'. Menunggu review.'); }
@@ -4689,18 +4689,24 @@ function _renderSubsList() {
 // ══════════════════════════════════════════
 // ADMIN
 // ══════════════════════════════════════════
-/* Urutan "terbaru dulu" untuk daftar admin. Sumber kebenaran: arrOrder yang
-   dipetakan dari urutan dokumen snapshot Firestore (dipasang di
-   startRealtimeListeners). Item lama tanpa arrOrder memakai id numerik
-   (Date.now) sebagai fallback. */
+/* Urutan "terbaru dulu" untuk daftar admin.
+   Sumber kebenaran utama: timestamp pendaftaran/pembuatan item — created_at
+   (tanggal daftar pengguna), atau ms epoch yang disimpan saat katalog dibuat.
+   Fallback: id numerik Date.now untuk item tanpa timestamp, lalu arrOrder
+   snapshot.created_ms dan saved_ms untuk kajian/speaker/mosque. */
+function _ikItemCreatedMs(x){
+  if(!x) return 0;
+  if(x.created_ms) return Number(x.created_ms)||0;
+  const ca=x.created_at;
+  if(ca){ const t=Date.parse(ca); if(!isNaN(t)) return t; }
+  return parseInt(String(x.id).replace(/^\D+/,''),10)||0;
+}
 function byNewest(a,b){
+  const am=_ikItemCreatedMs(a), bm=_ikItemCreatedMs(b);
+  if(am!==bm) return bm-am;
   const ao=a.arrOrder,bo=b.arrOrder;
   if(ao!=null&&bo!=null&&ao!==bo) return bo-ao;
-  if(ao!=null) return -1;
-  if(bo!=null) return 1;
-  const na=parseInt(String(a.id).replace(/^\D+/,''),10)||0;
-  const nb=parseInt(String(b.id).replace(/^\D+/,''),10)||0;
-  return nb-na;
+  return 0;
 }
 function renderAdmin() {
   if(!state.user||state.user.role!=='admin') return;

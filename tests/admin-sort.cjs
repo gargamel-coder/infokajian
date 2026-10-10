@@ -7,12 +7,12 @@ const {parseHTML}=require('linkedom');
 const html=fs.readFileSync('index.html','utf8');
 // Ekstrak from 'function byNewest' sampai sebelum 'function adminApprove' —
 // mencakup byNewest, renderAdmin, dan setAdminTab dalam satu scope VM.
-const start=html.indexOf('function byNewest(');
+const start=html.indexOf('function _ikItemCreatedMs(');
 const end=html.indexOf('function adminApprove(');
 const src=html.slice(start,end);
 assert.ok(start>0&&end>start,'rentang byNewest..adminApprove harus ada');
 assert.ok(src.includes('setAdminTab'),'setAdminTab harus berada dalam rentang');
-assert.ok(src.includes('byNewest'),'byNewest harus berada dalam rentang');
+assert.ok(src.includes('byNewest')&&src.includes('_ikItemCreatedMs'),'kedua helper harus dalam rentang');
 
 function buildFixture(){
   const {document}=parseHTML(html);
@@ -95,5 +95,24 @@ function buildFixture(){
    assert.ok(out.indexOf('Pending')<out.indexOf('Approved Baru'),'pending tetap di atas');
  });
 
+ await check('urutan mengikuti created_at: pendaftar terbaru paling atas (bug produksi)',async()=>{
+   const c=buildFixture();
+   // Data asli produksi: Rudi created 2026-04-19 (arrOrder tinggi dari snapshot), Zubair created 2026-10-10.
+   c.DB.users=[
+     {id:'abc_rudi',name:'Rudi',email:'r@x.test',role:'user',created_at:'2026-04-19',arrOrder:18},
+     {id:'xyz_zubair',name:'Zubair',email:'z@x.test',role:'user',created_at:'2026-10-10',arrOrder:12}];
+   c.state.adminTab='users';c.renderAdmin();c.setAdminTab('users');
+   const out=c.document.getElementById('admin-content').innerHTML;
+   assert.ok(out.indexOf('Zubair')<out.indexOf('Rudi'),'Zubair (2026-10-10) harus di atas Rudi (2026-04-19)');
+ });
+ await check('kajian dengan created_ms terurut benar',async()=>{
+   const c=buildFixture();
+   c.DB.kajian=[
+     {id:'k1000',title:'Kajian Lama',date:'2026-01-01',status:'approved',created_ms:1700000000000,arrOrder:5},
+     {id:'k2000',title:'Kajian Baru',date:'2026-01-02',status:'approved',created_ms:1790000000000,arrOrder:1}];
+   c.state.adminTab='kajian';c.setAdminTab('kajian');
+   const out=c.document.getElementById('admin-content').innerHTML;
+   assert.ok(out.indexOf('Kajian Baru')<out.indexOf('Kajian Lama'),'created_ms lebih besar dulu walau arrOrder lebih kecil');
+ });
  console.log(JSON.stringify({passed:passes,failed:fails}));if(fails)process.exitCode=1;
 })().catch(e=>{console.error(e);process.exitCode=1});
