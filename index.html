@@ -1792,6 +1792,7 @@ function _onFirebaseReady() {
     try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e) {}
     try { ikHandleRedirectResult(); } catch(e) {}
     auth.onAuthStateChanged(async function(user) {
+      const _observerGeneration = _ikAuthGeneration;
       if (user) {
         var u = DB.users.find(function(x) { return x.id === user.uid; });
         if (!u) {
@@ -1810,7 +1811,8 @@ function _onFirebaseReady() {
             }
           } catch(e) { console.warn('onAuthStateChanged user fetch error:', e); }
         }
-        if (u) {
+        if (u && auth.currentUser && auth.currentUser.uid === user.uid && _observerGeneration === _ikAuthGeneration) {
+          u = Object.assign({}, u, {role:user.emailVerified && user.email==='syahlanxzaelani@gmail.com'?'admin':(u.role==='contributor'?'contributor':'user')});
           state.user = u;
           startUserDataListener(user.uid);
           renderHome();
@@ -5028,16 +5030,26 @@ function renderProfile() {
 // ══════════════════════════════════════════
 /* Simpan/sinkronkan user hasil login Google, lalu masuk ke aplikasi.
    Dipakai bersama oleh alur popup maupun redirect. */
+var _ikAuthGeneration = 0;
 async function ikFinishGoogleLogin(user) {
-  if (!user) return;
+  if (!user || !auth || !auth.currentUser || auth.currentUser.uid !== user.uid) return;
+  const generation = _ikAuthGeneration;
   const uid = user.uid;
+  const active = () => generation === _ikAuthGeneration && auth.currentUser && auth.currentUser.uid === uid;
+  const trustedAdmin = user.emailVerified === true && user.email === 'syahlanxzaelani@gmail.com';
+  // Sesi sudah sah; pembacaan profil tidak boleh menahan layar masuk.
+  state.user = {id:uid,email:user.email||'',name:user.displayName||'Pengguna',photo:user.photoURL||'',role:trustedAdmin?'admin':'user'};
+  startUserDataListener(uid);
+  ntStartListener(uid);
+  goScreen('home'); renderHome(); injectNavs();
   let u = DB.users.find(x => x.id === uid);
   if (!u) {
     try {
       const doc = await db.collection('users').doc(uid).get();
       if (doc.exists) { var dd = doc.data(); dd.id = uid; u = dd; }
-    } catch (e) { console.warn('fetch user error:', e); }
+    } catch (e) { console.warn('fetch user error:', e); return; }
   }
+  if (!active()) return;
   if (!u) {
     var isAdm = user.email === 'syahlanxzaelani@gmail.com';
     u = {
@@ -5047,10 +5059,10 @@ async function ikFinishGoogleLogin(user) {
     };
     await fsSet('users', uid, u);
   }
+  if (!active()) return;
+  u = Object.assign({}, u, {role:trustedAdmin?'admin':(u.role==='contributor'?'contributor':'user')});
   if (!DB.users.find(x => x.id === uid)) DB.users.push(u);
   state.user = u;
-  startUserDataListener(uid);
-  ntStartListener(uid);
   showToast('Selamat datang, ' + ((u.name || u.email || '').split(' ')[0]) + '!', 's');
   goScreen('home'); renderHome(); injectNavs();
   if (state.notifPermission === 'granted') {
@@ -5229,6 +5241,7 @@ function ikHandleRedirectResult() {
 }
 
 function doLogout() {
+  _ikAuthGeneration++;
   stopUserDataListener();
   ntStopListener();
   if (auth) auth.signOut();
