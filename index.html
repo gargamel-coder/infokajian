@@ -5284,8 +5284,21 @@ async function ikPhoneSendCode(){
     setTimeout(function(){ var c=document.getElementById('ik-phone-code'); if(c) c.focus(); }, 100);
     showToast('Kode verifikasi dikirim ke ' + e164, 's');
   } catch (e) {
-    console.warn('phone send error:', e);
-    var msg = 'Gagal mengirim kode. Coba lagi.';
+    // Jangan simpan nomor, OTP, token captcha, atau kredensial dalam log.
+    var errorCode = String(e && e.code || 'unknown');
+    var errorMessage = String(e && e.message || 'Kesalahan tanpa keterangan').replace(/\+?\d{8,}/g, '[disamarkan]');
+    console.error('[OTP kirim]', {code: errorCode, message: errorMessage});
+    var detail = document.getElementById('ik-phone-error');
+    if (!detail) {
+      detail = document.createElement('p');
+      detail.id = 'ik-phone-error';
+      detail.setAttribute('role', 'alert');
+      detail.style.cssText = 'margin-top:12px;color:var(--danger);font-size:12px;overflow-wrap:anywhere';
+      document.getElementById('ik-phone-step1').appendChild(detail);
+    }
+    detail.textContent = 'Pengiriman gagal [' + errorCode + ']: ' + errorMessage;
+    var msg = 'Pengiriman gagal: ' + errorCode;
+    if (errorCode === 'auth/billing-not-enabled') msg = 'SMS memerlukan penagihan Firebase aktif. Sementara gunakan Google.';
     if (String(e.code||'').indexOf('invalid-phone-number')>=0) msg = 'Format nomor salah. Contoh: 81234567890';
     else if (String(e.code||'').indexOf('quota-exceeded')>=0) msg = 'Kuota SMS habis untuk hari ini. Silakan login dengan Google.';
     else if (String(e.code||'').indexOf('too-many-requests')>=0) msg = 'Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.';
