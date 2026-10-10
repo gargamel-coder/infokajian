@@ -1819,8 +1819,13 @@ function _onFirebaseReady() {
         }
         if (u && auth.currentUser && auth.currentUser.uid === user.uid && _observerGeneration === _ikAuthGeneration) {
           u = Object.assign({}, u, {role:user.emailVerified && user.email==='syahlanxzaelani@gmail.com'?'admin':(u.role==='contributor'?'contributor':'user')});
+          var _prevUid = state.user && state.user.id;
           state.user = u;
-          startUserDataListener(user.uid);
+          if (_prevUid !== user.uid) {
+            _userDataLoaded = false;
+            startUserDataListener(user.uid);
+            fsLoadUserData(user.uid);
+          }
           renderHome();
           injectNavs();
           // Re-init FCM dan ambil token setelah login
@@ -1863,6 +1868,10 @@ async function fsLoadCollection(collection) {
 }
 async function fsSaveUserData() {
   if (!db || !state.user) return;
+  // GUARD anti-timpa: state yang BELUM dimuat dari Firestore tidak boleh
+  // menulis. fsLoadUserData dipanggil di jalur login sebelum flag ini true;
+  // tanpa guard, notif selamat datang bawaan menimpa seluruh notifikasi lama.
+  if (!_userDataLoaded) { console.warn('[UserData] save ditunda: data belum dimuat dari Firestore'); return; }
   try {
     // Simpan SEMUA field setiap kali — pastikan Firestore selalu punya data lengkap
     // Ini mencegah snapshot parsial menghapus data yang belum tersimpan
@@ -1889,8 +1898,13 @@ async function fsLoadUserData(uid) {
       if (d.subscriptions)              state.subscriptions = d.subscriptions;
     }
     // Jika fresh user (doc tidak exist), state sudah diinisialisasi default di awal
-  } catch(e) { console.warn('Load user data error:', e); }
+    _userDataLoaded = true;
+    updateNotificationBadge();
+  } catch(e) { console.warn('Load user data error:', e); _userDataLoaded = true; }
 }
+// Flag: apakah userData (notifications/bookmarks/dll) SUDAH dimuat dari Firestore
+// untuk sesi login ini. Direset saat logout / ganti pengguna.
+var _userDataLoaded = false;
 async function fsLoadAll() {
   if (!db) return;
   const started = performance.now();
@@ -4208,8 +4222,9 @@ function renderNotifs() {
     notifs.forEach(function(n){ n.read = true; });
     updateNotificationBadge();
     injectNavs();
-    // Simpan ke Firestore (update array notifications)
-    if (state.user && db && fbReady) {
+    // Simpan ke Firestore (update array notifications) — hanya bila state SUDAH
+    // dimuat dari Firestore, agar notif selamat datang tidak menimpa yang lama
+    if (state.user && db && fbReady && _userDataLoaded) {
       db.collection('userData').doc(state.user.id)
         .set({ notifications: notifs }, { merge: true })
         .catch(function(e){ console.warn('[Notif] mark-read error:', e); });
@@ -5116,7 +5131,10 @@ async function ikFinishGoogleLogin(user) {
   const trustedAdmin = user.emailVerified === true && user.email === 'syahlanxzaelani@gmail.com';
   // Sesi sudah sah; pembacaan profil tidak boleh menahan layar masuk.
   state.user = {id:uid,email:user.email||'',name:user.displayName||'Pengguna',photo:user.photoURL||'',role:trustedAdmin?'admin':'user'};
+  _userDataLoaded = false;
   startUserDataListener(uid);
+  // Muat userData (notifications/bookmarks/dll) SEBELUM state bisa menimpa Firestore
+  await fsLoadUserData(uid);
   ntStartListener(uid);
   goScreen('home'); renderHome(); injectNavs();
   let u = DB.users.find(x => x.id === uid);
@@ -5325,6 +5343,7 @@ function doLogout() {
   state.user=null;
   state.bookmarks=[]; state.reminders=[]; state.attendances=[];
   state.notes=[]; state.currentNoteId=null; _ntGuestLoaded=false;
+  _userDataLoaded=false;
   state.notifications=[{message:'Selamat datang di Info Kajian!',read:false,timestamp:new Date().toISOString()}];
   state.subscriptions={speakers:[],mosques:[],contributors:[]};
   showToast('Berhasil keluar','s'); goScreen('home'); renderHome(); renderProfile();
