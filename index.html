@@ -1402,11 +1402,11 @@ function showBanner() {
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" style="width:28px;height:28px"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </div>
         <h2 style="font-size:20px;font-weight:800;color:var(--acc);margin-bottom:8px">Dukung Info Kajian</h2>
-        <p style="font-size:14px;color:var(--muted);margin-bottom:4px">Penerima: <strong>Yayasan Info Kajian Indonesia</strong></p>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:4px">Informasi penerima donasi belum diverifikasi.</p>
         <p style="font-size:13px;color:var(--muted);line-height:1.7">Donasi Anda membantu menjaga platform ini gratis, memperluas jangkauan kajian ke seluruh Indonesia, dan mendukung pengembangan fitur baru.</p>
       </div>
       <div class="card" style="padding:24px;text-align:center;margin-bottom:16px">
-        <p style="font-weight:700;font-size:15px;color:var(--acc);margin-bottom:16px">Scan QRIS untuk Donasi</p>
+        <p style="font-weight:700;font-size:15px;color:var(--acc);margin-bottom:16px">Donasi belum tersedia</p>
         <!-- QRIS SVG -->
         <svg class="qr-svg" id="qr-svg" viewBox="0 0 230 230" width="200" height="200" style="border:2px solid var(--border);border-radius:16px;padding:12px;margin-bottom:16px">
           <!-- Finder pattern TL -->
@@ -1462,10 +1462,10 @@ function showBanner() {
           <rect x="124" y="184" width="8" height="8" rx="1" fill="#AFE1AF"/>
           <rect x="140" y="150" width="8" height="8" rx="1" fill="#AFE1AF"/>
         </svg>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Scan dengan aplikasi perbankan atau e-wallet apapun</p>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:20px">Gambar ini hanya ilustrasi, bukan kode pembayaran. Jangan digunakan untuk transfer.</p>
         <button class="btn btn-p" onclick="downloadQR()" style="display:flex;align-items:center;justify-content:center;gap:8px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Unduh QR Code
+          Unduh Ilustrasi
         </button>
       </div>
       <div style="background:var(--pl);border-radius:14px;padding:16px">
@@ -2596,8 +2596,10 @@ function renderHomePrayerMini() {
 const IK_NAMES = ['Subuh','Terbit','Dzuhur','Ashar','Maghrib','Isya'];
 const IK_KEYS  = ['Fajr','Sunrise','Dhuhr','Asr','Maghrib','Isha'];
 const IK_PRAY  = ['Subuh','Dzuhur','Ashar','Maghrib','Isya'];
-const IK_FALLBACK = ['04:30','05:33','11:45','14:48','17:50','18:59'];
-let IK_TIMES = IK_FALLBACK.slice();
+let IK_TIMES = [];
+let IK_TIMES_KEY = '';
+function ikTimesKey(){ return state.location ? today()+'|'+state.location.lat+'|'+state.location.lng : ''; }
+function ikTimesReady(){ return !!ikTimesKey() && IK_TIMES_KEY===ikTimesKey() && IK_TIMES.length===6; }
 
 function ikMin(t){ const q=String(t||'').substring(0,5).split(':'); const h=parseInt(q[0],10), m=parseInt(q[1],10); return (isNaN(h)||isNaN(m))?0:h*60+m; }
 function ikFmt(m){ m=((Math.round(m)%1440)+1440)%1440; const h=Math.floor(m/60), mi=m%60; return (h<10?'0':'')+h+':'+(mi<10?'0':'')+mi; }
@@ -2628,6 +2630,17 @@ function ikTick(){
   const hd=document.getElementById('ik-hdate');
   if(hd) hd.textContent = fmtDateLong(today()) + ' · ' + fmtHijri(today());
 
+  if(!ikTimesReady()){
+    const put=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
+    put('ik-count-h',state.location?'Jadwal belum tersedia':'Aktifkan lokasi');
+    put('ik-count-n','--:--:--');
+    put('ik-azan','Lihat menu Sholat untuk jadwal');
+    const strip=document.getElementById('ik-hdr-strip');
+    if(strip) strip.innerHTML=IK_NAMES.map(n=>'<div class="ik-hs"><div class="ik-hs-nm">'+n+'</div><div class="ik-hs-tm">--:--</div></div>').join('');
+    const fill=document.getElementById('ik-bar-fill'),dot=document.getElementById('ik-bar-dot');
+    if(fill)fill.style.width='0%';if(dot)dot.style.left='0%';
+    return;
+  }
   const nx=ikNext(), nextIdx=nx.idx;
   const nextMin = ikMin(IK_TIMES[nextIdx]) + (nx.wrap?1440:0);
   const curMin  = nm + now.getSeconds()/60;
@@ -2675,14 +2688,15 @@ function ikTick(){
 
 function ikFetchTimes(){
   if(!state.location) return;
+  const key=ikTimesKey();
   const ts=Math.floor(Date.now()/1000);
-  fetch('https://api.aladhan.com/v1/timings/'+ts+'?latitude='+state.location.lat+'&longitude='+state.location.lng+'&method=20')
-    .then(function(r){ return r.json(); })
+  return fetch('https://api.aladhan.com/v1/timings/'+ts+'?latitude='+state.location.lat+'&longitude='+state.location.lng+'&method=20')
+    .then(function(r){ if(!r.ok) throw new Error('Prayer API unavailable'); return r.json(); })
     .then(function(d){
-      if(!(d.data&&d.data.timings)) return;
+      if(!(d.data&&d.data.timings) || key!==ikTimesKey()) return;
       const tt=d.data.timings;
-      const arr=IK_KEYS.map(function(k){ return String(tt[k]||'').split(' ')[0]; }).filter(Boolean);
-      if(arr.length===6){ IK_TIMES=arr; ikTick(); }
+      const arr=IK_KEYS.map(function(k){ return String(tt[k]||'').split(' ')[0]; });
+      if(arr.every(t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t))){ IK_TIMES=arr; IK_TIMES_KEY=key; ikTick(); }
     }).catch(function(){});
 }
 
@@ -2791,14 +2805,18 @@ function renderMosques(){
       +   (addr?'<div class="ik-mqcard-a">'+addr+'</div>':'')
       +   '<div class="ik-mqcard-m">'
       +     (distTxt?'<span class="ik-mqcard-d">'+distTxt+'</span>':'')
-      +     '<span class="ik-mqcard-t">Azan '+ikFmt(nextMin)+' '+nx.name+'</span>'
+      +     '<span class="ik-mqcard-t">'+(ikTimesReady()?'Jadwal lokasi Anda: '+ikFmt(nextMin)+' '+nx.name:'Jadwal sholat belum tersedia')+'</span>'
       +   '</div>'
       + '</div>'
-      + '<button class="ik-mqcard-nav" onclick="ikOpenMaps('+ (m.lat!=null?m.lat:'null') +','+ (m.lng!=null?m.lng:'null') +',' + JSON.stringify(m.name||'') + ')" aria-label="Buka peta" title="Buka peta">'
+      + '<button class="ik-mqcard-nav" data-mosque-index="'+rows.indexOf(m)+'" aria-label="Buka peta" title="Buka peta">'
       +   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>'
       + '</button>'
       + '</div>';
   }).join('');
+
+  listEl.querySelectorAll('[data-mosque-index]').forEach(function(button){
+    button.addEventListener('click',function(){const m=rows[Number(button.dataset.mosqueIndex)];ikOpenMaps(m.lat,m.lng,m.name);});
+  });
 
   if(mode==='all' && !state.location){
     // tanpa lokasi: tetap tampilkan semua, urut nama
@@ -5489,8 +5507,10 @@ function escapeICS(str) { return (str||'').replace(/[\\;,]/g, c=>'\\'+c).replace
 
 function buildICSEvent(k) {
   const spk = getSpeaker(k.speaker_id), msq = getMosque(k.mosque_id);
-  const dtStart = k.date.replace(/-/g,'') + 'T' + (k.time||'08:00').replace(':','') + '00+0700';
-  const dtEnd   = k.date.replace(/-/g,'') + 'T' + (()=>{ const [h,m]=(k.time||'08:00').split(':').map(Number); const e=new Date(2000,0,1,h,m+90); return String(e.getHours()).padStart(2,'0')+String(e.getMinutes()).padStart(2,'0'); })() + '00+0700';
+  const start = new Date(k.date+'T'+(k.time||'08:00')+':00+07:00');
+  const asICS = date=>date.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+  const dtStart = asICS(start);
+  const dtEnd = asICS(new Date(start.getTime()+90*60*1000));
   const summary = escapeICS(k.title);
   const location = escapeICS(msq?(msq.name+', '+msq.address):'');
   const desc = escapeICS([spk?'Pembicara: '+spk.full_name:'', msq?'Lokasi: '+msq.name:'', k.description||''].filter(Boolean).join('\\n'));
@@ -5500,8 +5520,8 @@ function buildICSEvent(k) {
     'BEGIN:VEVENT',
     'UID:'+uid,
     'DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z',
-    'DTSTART;TZID=Asia/Jakarta:'+dtStart,
-    'DTEND;TZID=Asia/Jakarta:'+dtEnd,
+    'DTSTART:'+dtStart,
+    'DTEND:'+dtEnd,
     'SUMMARY:'+summary,
     location?'LOCATION:'+location:'',
     desc?'DESCRIPTION:'+desc:'',
