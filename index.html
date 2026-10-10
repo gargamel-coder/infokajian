@@ -2828,7 +2828,7 @@ function renderHome() {
       var copy={}; for(var _k in k) copy[_k]=k[_k]; copy.dist=m?haversine(state.location.lat,state.location.lng,m.lat,m.lng):Infinity;
       return copy;
     }).sort(function(a,b){return a.dist-b.dist;});
-    document.getElementById('nearby-title').textContent = 'Kajian Terdekat';
+    document.getElementById('nearby-title').textContent = 'Kajian di Sekitarmu';
   } else {
     list = vis.filter(k=>k.date===T||k.date===addDays(T,1));
     document.getElementById('nearby-title').textContent = 'Kajian Hari Ini';
