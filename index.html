@@ -5241,6 +5241,27 @@ function ikInitGoogleLogin() { ikRenderGisButton(); }
    di localhost, Firebase mengizinkan reCAPTCHA test (di production
    perlu domain terdaftar di Authorized domains).
    ══════════════════════════════════════════════════════════════ */
+// Catat hanya status dan pesan error endpoint OTP, bukan payload atau token.
+var _ikOtpNetworkError = null;
+(function(){
+  var originalFetch = window.fetch;
+  window.fetch = async function(input, options){
+    var response = await originalFetch.apply(this, arguments);
+    var url = new URL(typeof input === 'string' ? input : input.url, location.href);
+    if (url.hostname === 'identitytoolkit.googleapis.com' && url.pathname === '/v1/accounts:sendVerificationCode') {
+      _ikOtpNetworkError = null;
+      if (!response.ok) {
+        try {
+          var body = await response.clone().json();
+          var message = String(body.error && body.error.message || 'Respons tanpa pesan').replace(/\+?\d{8,}/g, '[disamarkan]').slice(0,500);
+          _ikOtpNetworkError = {status:response.status, message:message};
+          console.error('[OTP HTTP]', _ikOtpNetworkError);
+        } catch(ignore) { _ikOtpNetworkError = {status:response.status, message:'Respons bukan JSON'}; }
+      }
+    }
+    return response;
+  };
+})();
 var _ikPhoneConfirm = null;
 var _ikPhoneRcHolder = null;
 
@@ -5296,7 +5317,7 @@ async function ikPhoneSendCode(){
       detail.style.cssText = 'margin-top:12px;color:var(--danger);font-size:12px;overflow-wrap:anywhere';
       document.getElementById('ik-phone-step1').appendChild(detail);
     }
-    detail.textContent = 'Pengiriman gagal [' + errorCode + ']: ' + errorMessage;
+    detail.textContent = 'Pengiriman gagal [' + errorCode + ']: ' + errorMessage + (_ikOtpNetworkError ? ' | HTTP ' + _ikOtpNetworkError.status + ': ' + _ikOtpNetworkError.message : ' | Tidak ada respons error HTTP OTP yang tertangkap.');
     var msg = 'Pengiriman gagal: ' + errorCode;
     if (errorCode === 'auth/billing-not-enabled') msg = 'SMS memerlukan penagihan Firebase aktif. Sementara gunakan Google.';
     if (String(e.code||'').indexOf('invalid-phone-number')>=0) msg = 'Format nomor salah. Contoh: 81234567890';
