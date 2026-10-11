@@ -29,10 +29,7 @@ const ctx={document,DB,state,STATUS,saved,toasts,
   showToast:(m,k)=>toasts.push({m,k}),renderAdmin(){},setAdminTab(){},adminSetStatus(){},adminVerifyMq(){},adminVerifySpk(){},
   confirmDelete(){},openModal(){},closeModal(){},iconSVG:()=>'',console};
 vm.createContext(ctx);
-// Inject error nyata dari adminSaveMq: buang catch generik agar penyebab terlihat.
-let _vm=html.slice(html.indexOf('function setAdminTab(tab,btn)'),html.indexOf('function adminApprove'));
-_vm=_vm.split('}catch(e){').join('}catch(e){console.log("CATCH",String(e&&e.message));');
-vm.runInContext(_vm,ctx);
+vm.runInContext(html.slice(html.indexOf('function setAdminTab(tab,btn)'),html.indexOf('function adminApprove')),ctx);
 vm.runInContext(`function runTab(t){state.adminTab=t;setAdminTab(t,null);return document.getElementById('admin-content').innerHTML;} this.runTab=runTab;`,ctx);
 
 // 1) Pencarian kajian

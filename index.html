@@ -4711,13 +4711,28 @@ function renderAdmin() {
     setAdminTab(state.adminTab||'kajian');
   }
 }
+var analyticsPanelLoad;
+function openAnalyticsPanel(host) {
+  if(!state.user || state.user.role!=='admin'){host.textContent='Analitik khusus admin.';return;}
+  host.textContent='Memuat analitik…';
+  if(!analyticsPanelLoad) analyticsPanelLoad=new Promise(function(resolve,reject){
+    var script=document.createElement('script');script.src='/analytics-admin.js';script.async=true;
+    script.onload=resolve;script.onerror=function(){script.remove();analyticsPanelLoad=null;reject(new Error('load'));};
+    document.head.appendChild(script);
+  });
+  analyticsPanelLoad.then(function(){
+    if(state.adminTab!=='analytics')return;
+    IKAnalyticsAdmin.render(host,{admin:!!(state.user && state.user.role==='admin')});
+  }).catch(function(){if(state.adminTab==='analytics')host.textContent='Analitik gagal dimuat. Buka ulang tab untuk mencoba lagi.';});
+}
 function setAdminTab(tab,btn) {
   state.adminTab=tab;
   document.querySelectorAll('#admin-tabs .tab').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  else { var tabMap={'kajian':0,'speakers':1,'mosques':2,'users':3}; var tabEl=document.querySelectorAll('#admin-tabs .tab')[tabMap[tab]]; if(tabEl)tabEl.classList.add('active'); }
+  else { var tabMap={'kajian':0,'speakers':1,'mosques':2,'users':3,'analytics':4}; var tabEl=document.querySelectorAll('#admin-tabs .tab')[tabMap[tab]]; if(tabEl)tabEl.classList.add('active'); }
   const c=document.getElementById('admin-content');
   if(!c)return;
+  if(tab==='analytics'){openAnalyticsPanel(c);return;}
   // Pencarian admin: filter lokal dari data yang sudah dimuat, tanpa panggilan jaringan.
   var _q=(state.adminSearch&&typeof state.adminSearch==='object')?state.adminSearch:{};
   if(_q.tab!==tab){_q.tab=tab;_q.text='';}
@@ -4787,7 +4802,7 @@ function adminEditMq(id){
     district:document.getElementById('adm-mq-kecamatan').value,
     lat:document.getElementById('adm-mq-lat').value,
     lng:document.getElementById('adm-mq-lng').value});};
-  openModal('modal-mq');
+  openModal('modal-mq-edit');
 }
 async function adminSaveMq(id,form){
   if(!state.user||state.user.role!=='admin'){showToast('Khusus admin','e');return {ok:false};}
@@ -4812,7 +4827,7 @@ async function adminSaveMq(id,form){
     const updated=Object.assign({},m,upd);
     await fsSet('mosques',m.id,updated);
     Object.assign(m,upd);
-    closeModal('modal-mq');
+    closeModal('modal-mq-edit');
     showToast('Masjid diperbarui','s');
     if(state.adminTab==='mosques')setAdminTab('mosques',null);
     return {ok:true};
@@ -7399,7 +7414,7 @@ function toggleReminder() {
 </div>
 
 <!-- Modal Edit Masjid (admin) -->
-<div id="modal-mq" class="overlay" onclick="closeModal('modal-mq')">
+<div id="modal-mq-edit" class="overlay" onclick="closeModal('modal-mq-edit')">
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div style="padding:0 8px">
@@ -7407,7 +7422,7 @@ function toggleReminder() {
       <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:8px">Kosongkan kedua koordinat untuk mempertahankan nilai lama.</p>
       <div id="admin-mq-body"></div>
       <div style="display:flex;gap:10px;margin-top:16px">
-        <button class="btn btn-o" onclick="closeModal('modal-mq')">Batal</button>
+        <button class="btn btn-o" onclick="closeModal('modal-mq-edit')">Batal</button>
         <button id="adm-mq-save" class="btn btn-p">Simpan</button>
       </div>
     </div>
