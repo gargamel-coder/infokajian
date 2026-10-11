@@ -42,33 +42,33 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log("[SW] Background message received:", payload);
 
-  const { title, body } = payload.notification || {};
-  const data            = payload.data          || {};
-
-  const kajianId    = data.kajianId    || "";
-  const kajianTitle = data.kajianTitle || title || "Kajian Baru";
-  const pwaUrl      = self.location.origin;
+  // Pesan kini DATA-ONLY (CF tidak mengirim notification field) —
+  // hanya SW ini yang menampilkan notifikasi, jadi tidak ada duplikat.
+  const d = payload.data || {};
+  const n = payload.notification || {};
+  const title    = d.title || n.title || "Info Kajian";
+  const body     = d.body  || n.body  || "";
+  const kajianId = d.kajianId || "";
+  const origin   = self.location.origin;
 
   const notificationOptions = {
     body  : body || "Ada kajian baru yang menarik untukmu!",
-    icon  : `${pwaUrl}/icons/icon-192.png`,
-    badge : `${pwaUrl}/icons/badge-72.png`,
-    image : data.imageUrl || undefined,
-    tag   : `kajian-${kajianId}`,            // Ganti notif lama dengan kajianId sama
+    icon  : `${origin}/icons/icon-192.png`,
+    badge : `${origin}/icons/badge-72.png`,
+    image : d.imageUrl || undefined,
+    tag   : d.id ? `notif-${d.id}` : `notif-${kajianId || Date.now()}`,   // dedup per notif, bukan per kajian
     renotify    : false,
     requireInteraction: false,
     vibrate: [200, 100, 200],
     data  : {
       kajianId,
-      url: kajianId
-        ? `${pwaUrl}/#/kajian/${kajianId}`
-        : `${pwaUrl}/`,
+      type: d.type || "",
     },
     actions: [
       {
         action: "open_kajian",
         title : "📖 Lihat Kajian",
-        icon  : `${pwaUrl}/icons/icon-96.png`,
+        icon  : `${origin}/icons/icon-96.png`,
       },
       {
         action: "dismiss",
@@ -77,42 +77,33 @@ messaging.onBackgroundMessage((payload) => {
     ],
   };
 
-  return self.registration.showNotification(
-    title || kajianTitle,
-    notificationOptions
-  );
+  return self.registration.showNotification(title, notificationOptions);
 });
 
 // ─── 4. Notifikasi click handler ──────────────────────────────────────────────
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const data     = event.notification.data || {};
-  const action   = event.action;
-  const targetUrl = data.url || self.location.origin;
+  // "Tutup" → tidak buka apa-apa
+  if (event.action === "dismiss") return;
 
-  // Jika user klik "Tutup" → tidak buka apa-apa
-  if (action === "dismiss") return;
+  const kajianId = (event.notification.data || {}).kajianId || "";
+  const url = kajianId
+    ? `${self.location.origin}/?kajian=${encodeURIComponent(kajianId)}`  // deep link format yang dikenali klien
+    : self.location.origin;
 
-  // Untuk "open_kajian" atau klik notif langsung → buka PWA
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((windowClients) => {
-        // Cek apakah PWA sudah terbuka di tab manapun
-        for (const client of windowClients) {
-          const clientUrl = new URL(client.url);
-          const swOrigin  = new URL(self.location.origin);
-
-          if (clientUrl.origin === swOrigin.origin) {
-            // PWA sudah terbuka → navigasi ke kajian + focus
-            client.navigate(targetUrl);
-            return client.focus();
-          }
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (new URL(c.url).origin === self.location.origin) {
+          // App sudah terbuka: kirim pesan ke halaman (bukan navigate —
+          // navigasi URL yang hanya beda hash tidak memicu apa pun)
+          c.postMessage({ type: "NOTIF_CLICK", kajianId });
+          return c.focus();
         }
-        // PWA belum terbuka → buka tab baru
-        return clients.openWindow(targetUrl);
-      })
+      }
+      return clients.openWindow(url);
+    })
   );
 });
 

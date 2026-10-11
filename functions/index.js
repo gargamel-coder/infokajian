@@ -18,10 +18,9 @@ const db  = getFirestore();
 const fcm = getMessaging();
 
 // ─── Konstanta ────────────────────────────────────────────────────────────────
-const PWA_URL    = "https://infokajian.vercel.app";
-const ICON_URL   = `${PWA_URL}/icons/icon-192.png`;
-const BADGE_URL  = `${PWA_URL}/icons/badge-72.png`;
-const FCM_BATCH  = 500;
+const PWA_URL    = "https://www.infokajian.app";   // domain produksi, bukan vercel
+const ADMIN_EMAIL = "syahlanxzaelani@gmail.com";
+const FCM_BATCH  = 500;   // (ICON_URL/BADGE_URL dihapus: push kini data-only, ikon ditentukan SW)
 const MAX_TOKENS = 2000;
 
 // ─── Helper: format tanggal singkat ──────────────────────────────────────────
@@ -166,13 +165,14 @@ async function saveNotificationsToFirestore(uids, payload) {
   const timestamp = new Date().toISOString();
 
   const notif = {
+    id       : payload.id,        // ID unik sekali-generate di pemanggil, sama dengan push
     title    : payload.title,
     body     : payload.body,
     message  : payload.message,
     kajianId : payload.kajianId,
     read     : false,
     timestamp: timestamp,
-    type     : "new_kajian",
+    type     : payload.type || "new_kajian",
   };
 
   const WRITE_BATCH = 400;
@@ -252,6 +252,7 @@ async function processKajian(kajianId, kajianData) {
   const notifTitle   = `Kajian Baru - ${speakerName}`;
   const notifBody    = `"${kajianTitle}" pada ${dateStr}`;
   const notifMessage = `Kajian baru dari ${speakerName}: "${kajianTitle}" pada ${dateStr}`;
+  const notifId      = `n_${kajianId}_${Date.now()}`;
 
   // 1. Cari subscriber
   const subscriberUids = await findSubscriberUids(kajianData);
@@ -264,15 +265,18 @@ async function processKajian(kajianId, kajianData) {
 
   const targetUids = subscriberUids.slice(0, MAX_TOKENS);
 
-  // 2. Simpan in-app notif ke Firestore
+  // 2. Simpan in-app notif ke Firestore (dengan id yang sama dengan push)
   await saveNotificationsToFirestore(targetUids, {
+    id     : notifId,
     title  : notifTitle,
     body   : notifBody,
     message: notifMessage,
     kajianId,
+    type   : "new_kajian",
   });
 
-  // 3. Ambil FCM tokens dan kirim push notification
+  // 3. Ambil FCM tokens dan kirim push — DATA-ONLY: hanya SW yang menampilkan
+  //    notifikasi (satu kali), tidak ada duplikat dari SDK/notification field.
   const tokenToUid = await fetchTokenMap(targetUids);
   const tokens     = [...tokenToUid.keys()];
   logger.info(`[FCM] Collected ${tokens.length} FCM token(s).`);
@@ -280,31 +284,14 @@ async function processKajian(kajianId, kajianData) {
   if (tokens.length > 0) {
     const message = {
       tokens,
-      notification: {
-        title: notifTitle,
-        body : notifBody,
+      data: {
+        id      : notifId,
+        title   : notifTitle,
+        body    : notifBody,
+        kajianId: kajianId,
+        type    : "new_kajian",
       },
-      webpush: {
-        notification: {
-          title  : notifTitle,
-          body   : notifBody,
-          icon   : ICON_URL,
-          badge  : BADGE_URL,
-          vibrate: [200, 100, 200],
-          requireInteraction: false,
-          actions: [
-            { action: "open_kajian", title: "Lihat Kajian" },
-            { action: "dismiss",     title: "Tutup" },
-          ],
-        },
-        fcmOptions: {
-          link: `${PWA_URL}/#/kajian/${kajianId}`,
-        },
-        data: {
-          kajianId,
-          url: `${PWA_URL}/#/kajian/${kajianId}`,
-        },
-      },
+      webpush: { headers: { Urgency: "high", TTL: "86400" } },
     };
 
     await sendMulticast(tokens, message, tokenToUid);
@@ -313,6 +300,66 @@ async function processKajian(kajianId, kajianData) {
   // 4. Tandai kajian sudah diproses
   await db.collection("kajian").doc(kajianId).update({ fcmSent: true });
   logger.info(`[FCM] Done processing kajian ${kajianId}.`);
+}
+
+// ─── Helper: kirim notif ke semua admin (inbox via arrayUnion + push data-only) ──
+async function getAdminUids() {
+  const snap = await db.collection("users").where("email", "==", ADMIN_EMAIL).get();
+  return snap.docs.map(d => d.id);
+}
+
+async function notifyAdmins({ id, title, body, type }) {
+  const adminUids = await getAdminUids();
+  if (!adminUids.length) { logger.warn("[ADMIN] admin user doc tidak ditemukan"); return; }
+
+  const notif = {
+    id, title, body, message: `${title}: ${body}`,
+    read: false, timestamp: new Date().toISOString(), type,
+  };
+  for (const uid of adminUids) {
+    await db.collection("userData").doc(uid)
+      .set({ notifications: FieldValue.arrayUnion(notif) }, { merge: true });
+  }
+
+  const tokenToUid = await fetchTokenMap(adminUids);
+  const tokens = [...tokenToUid.keys()];
+  if (tokens.length) {
+    await sendMulticast(tokens, {
+      data: { id, title, body, type },   // data-only: semua nilai string
+      webpush: { headers: { Urgency: "high", TTL: "86400" } },
+    }, tokenToUid);
+  }
+  logger.info(`[ADMIN] notify ${adminUids.length} admin(s), type=${type}`);
+}
+
+// ─── Helper: notif ke kontributor saat kajian disetujui/ditolak ──────────────
+async function notifyContributorServer({ kajianId, submittedBy, status }) {
+  if (!submittedBy) return;
+  const approved = status === "approved";
+  const title = approved ? "Kajian Disetujui" : "Kajian Ditolak";
+  const body  = approved
+    ? `Kajian Anda telah disetujui dan dipublikasikan.`
+    : `Kajian Anda ditolak. Silakan periksa dan submit ulang.`;
+  const id = `n_${kajianId}_${status}_${Date.now()}`;
+
+  const notif = {
+    id, title, body, message: `${title}: ${body}`,
+    read: false, timestamp: new Date().toISOString(),
+    type: approved ? "kajian_approved" : "kajian_rejected",
+    kajianId,
+  };
+  await db.collection("userData").doc(submittedBy)
+    .set({ notifications: FieldValue.arrayUnion(notif) }, { merge: true });
+
+  const tokenToUid = await fetchTokenMap([submittedBy]);
+  const tokens = [...tokenToUid.keys()];
+  if (tokens.length) {
+    await sendMulticast(tokens, {
+      data: { id, title, body, kajianId: kajianId, type: notif.type },
+      webpush: { headers: { Urgency: "high", TTL: "86400" } },
+    }, tokenToUid);
+  }
+  logger.info(`[FCM] contributor notified: ${submittedBy} status=${status}`);
 }
 
 // ─── Export Cloud Functions ───────────────────────────────────────────────────
@@ -330,7 +377,36 @@ exports.onKajianCreated = onDocumentCreated(
     if (!kajianData) return;
 
     logger.info(`[FCM] onKajianCreated triggered: ${kajianId}`);
+
+    // Kajian pending: admin perlu tahu untuk review — subscriber belum diberi tahu
+    if (kajianData.status === "pending") {
+      await notifyAdmins({
+        id: `pending_${kajianId}`,
+        title: "Kajian menunggu review",
+        body : `Kajian baru "${kajianData.title || "tanpa judul"}" menunggu review Anda.`,
+        type : "pending_kajian",
+      });
+      return;
+    }
+
     await processKajian(kajianId, kajianData);
+  }
+);
+
+// Admin: pengguna baru mendaftar
+exports.onUserCreated = onDocumentCreated(
+  { document: "users/{uid}", region: "asia-southeast1", timeoutSeconds: 60, memory: "256MiB" },
+  async (event) => {
+    const u = event.data?.data();
+    if (!u || u.email === ADMIN_EMAIL) return;
+    const name  = String(u.name || "Pengguna").slice(0, 80);
+    const email = String(u.email || "").slice(0, 120);
+    await notifyAdmins({
+      id   : `new_user_${event.params.uid}`,
+      title: "Pendaftaran baru",
+      body : `${name} baru mendaftar di Info Kajian${email ? ` (${email})` : ""}.`,
+      type : "new_user",
+    });
   }
 );
 
@@ -350,7 +426,17 @@ exports.onKajianUpdated = onDocumentUpdated(
 
     const statusChanged = before.status !== after.status;
     const nowApproved   = after.status  === "approved";
+    const nowRejected   = after.status  === "rejected";
     const alreadySent   = after.fcmSent  === true;
+
+    // Kontributor perlu tahu kajiannya disetujui/ditolak (klien tidak bisa
+    // menulis ke userData user lain — rules)
+    if (statusChanged && nowApproved) {
+      await notifyContributorServer({ kajianId, submittedBy: after.submitted_by, status: "approved" });
+    }
+    if (statusChanged && nowRejected) {
+      await notifyContributorServer({ kajianId, submittedBy: after.submitted_by, status: "rejected" });
+    }
 
     if (!statusChanged || !nowApproved || alreadySent) {
       logger.info(`[FCM] onKajianUpdated skip: ${kajianId} – statusChanged=${statusChanged}, nowApproved=${nowApproved}, alreadySent=${alreadySent}`);

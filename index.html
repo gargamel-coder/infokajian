@@ -2015,8 +2015,8 @@ function startUserDataListener(uid) {
       if (Array.isArray(d.attendances)) state.attendances = d.attendances;
       if (d.subscriptions)              state.subscriptions = d.subscriptions;
       // Notifikasi: GABUNGKAN (merge by id) server + lokal, sort terbaru dulu.
-      // Jangan menimpa state — notif yang masuk via onMessage FCM (foreground)
-      // atau via arrayUnion CF setelah snapshot terakhir harus tetap ada.
+      // Urutan WAJIB: set state dulu, BARU apply read flags (flags membaca
+      // state.notifications), baru badge/nav.
       if (Array.isArray(d.notifications)) {
         var server = d.notifications.slice();
         var seen = {};
@@ -2029,8 +2029,8 @@ function startUserDataListener(uid) {
           var tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.timestamp || 0).getTime();
           return tb - ta;
         });
-        _notifApplyReadFlags();
         state.notifications = server;
+        _notifApplyReadFlags();
         updateNotificationBadge();
         injectNavs();
       }
@@ -2509,9 +2509,21 @@ function kajianCardHTML(k, dist=null, showBm=true) {
 }
 
 function openKajian(id) {
-  state.currentKajianId = id;
-  goScreen('detail');
-  renderDetail(id);
+  // Deep link dari push bisa tiba sebelum katalog selesai dimuat — retry
+  // seperti handleDeepLink, jangan render detail kosong.
+  var tries = 0;
+  function tryOpen() {
+    var k = DB.kajian.find(function(x){ return x.id === id; });
+    if (k) {
+      state.currentKajianId = id;
+      goScreen('detail');
+      renderDetail(id);
+      return;
+    }
+    if (++tries < 10) setTimeout(tryOpen, 500);
+    else goScreen('home');
+  }
+  tryOpen();
 }
 
 function toggleBmFromCard(id) {
@@ -4232,7 +4244,14 @@ function renderAttendance() {
 function _notifReadKey(){ return 'ik_notif_read_' + ((state.user && state.user.id) || 'guest'); }
 function _notifReadSet(){ try { return JSON.parse(localStorage.getItem(_notifReadKey()) || '{}'); } catch(e){ return {}; } }
 function _notifReadSave(m){ try { localStorage.setItem(_notifReadKey(), JSON.stringify(m)); } catch(e){} }
-function _notifId(n){ return n.kajianId || (n.timestamp ? 'ts_' + n.timestamp : (n.message || '')); }
+function _notifId(n){
+  return n.id || n.kajianId || (n.timestamp ? 'ts_' + n.timestamp : (n.message || ''));
+}
+// ID unik untuk notif yang dibuat lokal di klien
+function ikNewNotifId(){ return 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+// Escape HTML — semua teks notifikasi masuk via innerHTML, wajib di-escape
+function ikEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function _notifApplyReadFlags(){
   var m = _notifReadSet();
   (state.notifications || []).forEach(function(n){ if (m[_notifId(n)]) n.read = true; });
@@ -4259,11 +4278,13 @@ function renderNotifs() {
     return;
   }
   el.innerHTML = notifs.map(function(n, i) {
-    // Support field baru (title+body dari CF) dan lama (message)
-    var displayText = n.title ? ('<strong style="display:block;font-size:14px;line-height:1.4;margin-bottom:2px">' + (n.title||'') + '</strong>' + (n.body ? '<span style="font-size:13px;color:var(--muted)">' + n.body + '</span>' : '')) : ('<span style="font-size:14px;line-height:1.4">' + (n.message||'') + '</span>');
+    // Support field baru (title+body dari CF) dan lama (message) — SEMUA teks
+    // di-escape (stored XSS: nama/email user baru ikut masuk notif admin)
+    var t = ikEsc(n.title), b = ikEsc(n.body), m = ikEsc(n.message);
+    var displayText = n.title ? ('<strong style="display:block;font-size:14px;line-height:1.4;margin-bottom:2px">' + t + '</strong>' + (n.body ? '<span style="font-size:13px;color:var(--muted)">' + b + '</span>' : '')) : ('<span style="font-size:14px;line-height:1.4">' + m + '</span>');
     var ts = n.createdAt && n.createdAt.toDate ? n.createdAt.toDate() : new Date(n.timestamp || 0);
     var dateStr = ts.toLocaleString('id-ID', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    var clickAction = n.kajianId ? 'openKajian(\'' + n.kajianId + '\')' : '';
+    var clickAction = n.kajianId ? 'openKajian(\'' + ikEsc(n.kajianId).replace(/'/g,'') + '\')' : '';
     return '<div onclick="' + clickAction + '" style="background:' + (n.read?'#fff':'var(--pl)') + ';border-radius:14px;padding:16px;border:1px solid ' + (n.read?'var(--border)':'var(--pm)') + ';margin-bottom:8px;cursor:' + (n.kajianId?'pointer':'default') + '">'
       + '<div style="display:flex;gap:10px">'
       + '<div style="width:36px;height:36px;background:var(--p);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:16px;height:16px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>'
@@ -4443,7 +4464,7 @@ function doSubmit() {
     } else {
       const k={id:'k'+Date.now(),title:title,topic:topic,speaker_id:state.selectedSpeakerId,mosque_id:state.selectedMosqueId,date:date,time:time,status:(state.user&&state.user.role==='admin')?'approved':'pending',description:desc,source:source,submitted_by:(state.user&&state.user.id)||'u1',created_ms:Date.now()};
       DB.kajian.push(k);
-      fsSet('kajian',k.id,k);      if(state.user&&state.user.role==='admin'){state.notifications.unshift({message:'Kajian "'+title+'" berhasil dipublikasikan!',read:false,timestamp:new Date().toISOString()});notifySubscribers(k);showToast('Kajian berhasil dipublikasikan!','s');}
+      fsSet('kajian',k.id,k);      if(state.user&&state.user.role==='admin'){state.notifications.unshift({id:ikNewNotifId(),message:'Kajian "'+title+'" berhasil dipublikasikan!',read:false,timestamp:new Date().toISOString()});notifySubscribers(k);showToast('Kajian berhasil dipublikasikan!','s');}
       else { showToast('Kajian dikirim untuk review admin.','s'); notifyAdmin('Kajian baru "'+title+'" disubmit oleh '+((state.user&&state.user.name)||'kontributor')+'. Menunggu review.'); }
     }
     goBack();
@@ -4451,102 +4472,23 @@ function doSubmit() {
 }
 
 // ══════════════════════════════════════════
-// ADMIN NOTIFICATION HELPER
+// ADMIN NOTIFICATION HELPER — NO-OP (dipindah ke Cloud Functions)
 // ══════════════════════════════════════════
+/* Semua notifikasi lintas user kini dikirim Cloud Functions (Admin SDK tidak
+   terkena Firestore rules). Versi klien dulu selalu permission-denied karena
+   rules userData owner-only, dan errornya hanya console.warn — gagal diam-diam.
+   Fungsi di bawah dipertahankan sebagai no-op agar pemanggil lama tidak error. */
 function notifyAdmin(message) {
-  // Only add to state if current user is admin
-  if (state.user && state.user.role === 'admin') {
-    state.notifications.unshift({message, read: false, timestamp: new Date().toISOString()});
-    fsSaveUserData();
-    return;
-  }
-  // Otherwise write directly to each admin's Firestore userData
-  if (!db) return;
-  const admins = DB.users.filter(u => u.role === 'admin');
-  admins.forEach(admin => {
-    // arrayUnion: tambah notif TANPA menimpa array lama — aman dari balapan
-    // read-modify-write yang dulu menghilangkan notifikasi (lihat fsSaveUserData).
-    db.collection('userData').doc(admin.id).set(
-      { notifications: firebase.firestore.FieldValue.arrayUnion({message, read: false, timestamp: new Date().toISOString()}) },
-      { merge: true }
-    ).catch(e => console.warn('notifyAdmin error:', e));
-  });
+  console.log('[NOTIF] notifyAdmin no-op — ditangani Cloud Function.');
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   ADMIN NOTIF: PENDAFTARAN PENGGUNA BARU
-   Dipanggil dari onAuthStateChanged ketika dokumen user baru dibuat.
-   Tanpa sesi admin aktif, klien menulis ke userData admin (diizinkan
-   rules: owner-only untuk admin sendiri) dan menyiapkan payload FCM
-   melalui _fcmSend jika tersedia (mis. saat backend/relay tersedia).
-   Tidak mengirim push FCM langsung dari klien — FCM HTTP API butuh
-   kredensial server dan tidak boleh diekspos di sisi klien.
-   ══════════════════════════════════════════════════════════════════════ */
 function notifyNewUser(nu) {
-  if (!nu || !nu.uid) return Promise.resolve();
-  const name = String(nu.name || '').slice(0, 80) || 'Pengguna';
-  const email = String(nu.email || '').slice(0, 120);
-  const message = 'Pengguna baru mendaftar: ' + name + (email ? ' (' + email + ')' : '') + '.';
-  const timestamp = nu.timestamp || new Date().toISOString();
-
-  // Admin sedang aktif di sesi ini: masuk inbox lokal saja.
-  if (state.user && state.user.role === 'admin') {
-    state.notifications.unshift({message, read: false, timestamp, type: 'new_user'});
-    fsSaveUserData();
-    return Promise.resolve();
-  }
-
-  if (!db) return Promise.resolve();
-  const admins = DB.users.filter(u => u.role === 'admin');
-  if (!admins.length) return Promise.resolve();
-
-  const notif = {message, read: false, timestamp, type: 'new_user'};
-  const fcmPayload = {
-    title: 'Pendaftaran baru',
-    body : name + (email ? ' (' + email + ')' : '') + ' baru mendaftar di Info Kajian.',
-    link : 'https://www.infokajian.app/#/admin'
-  };
-
-  return Promise.all(admins.map(admin =>
-    // arrayUnion: tambah notif TANPA menimpa array lama (anti balapan/hilang)
-    db.collection('userData').doc(admin.id).set(
-      { notifications: firebase.firestore.FieldValue.arrayUnion(notif) },
-      { merge: true }
-    ).then(() => {
-      // Kirim push FCM ke admin bila helper _fcmSend tersedia (server/relay).
-      // Fallback: notif masuk ke inbox admin dan muncul saat admin membuka app.
-      if (typeof _fcmSend === 'function') return _fcmSend(fcmPayload).catch(e => console.warn('push admin error:', e));
-    }).catch(e => console.warn('notifyNewUser error:', e))
-  )).then(() => {});
+  console.log('[NOTIF] notifyNewUser no-op — ditangani Cloud Function onUserCreated.');
+  return Promise.resolve();
 }
 
-// FEATURE 3: Notify contributor when their kajian is approved or rejected
 function notifyContributor(kajian, status) {
-  if (!kajian.submitted_by) return;
-  const statusLabel = status === 'approved' ? 'disetujui ✓' : 'ditolak ✕';
-  const statusMsg = status === 'approved'
-    ? `Selamat! Kajian Anda "${kajian.title}" telah disetujui dan dipublikasikan.`
-    : `Kajian Anda "${kajian.title}" ditolak oleh admin. Silakan periksa dan submit ulang.`;
-  const notif = {
-    message: statusMsg,
-    read: false,
-    timestamp: new Date().toISOString(),
-    forUser: kajian.submitted_by,
-    kajianId: kajian.id,
-    type: 'kajian_status'
-  };
-  // If the contributor is the current logged-in user, add to their in-memory notifications
-  if (state.user && state.user.id === kajian.submitted_by) {
-    state.notifications.unshift(notif);
-    fsSaveUserData();
-  } else if (db) {
-    // Write notification directly to contributor's userData in Firestore
-    // arrayUnion: tambah TANPA menimpa array lama (anti balapan/hilang)
-    db.collection('userData').doc(kajian.submitted_by).set(
-      { notifications: firebase.firestore.FieldValue.arrayUnion(notif) },
-      { merge: true }
-    ).catch(e => console.warn('notifyContributor error:', e));
-  }
+  console.log('[NOTIF] notifyContributor no-op — ditangani Cloud Function onKajianUpdated.');
 }
 
 // ══════════════════════════════════════════
@@ -4570,37 +4512,9 @@ function sendBrowserNotif(title, body) {
 }
 
 function notifySubscribers(kajian) {
-  const spk = getSpeaker(kajian.speaker_id);
-  const msq = getMosque(kajian.mosque_id);
-  const submitter = DB.users.find(u=>u.id===kajian.submitted_by);
-  let notified = false;
-  // Check speaker subscription (user yang sedang login)
-  if (spk && state.subscriptions.speakers.includes(spk.id)) {
-    const msg = `Kajian baru dari ${spk.full_name}: "${kajian.title}" pada ${fmtDateShort(kajian.date)}`;
-    state.notifications.unshift({message:msg, read:false, timestamp:new Date().toISOString(), type:'new_kajian', kajianId:kajian.id});
-    sendBrowserNotif('Kajian Baru - ' + spk.full_name, kajian.title);
-    notified = true;
-  }
-  // Check mosque subscription
-  if (msq && state.subscriptions.mosques.includes(msq.id) && !notified) {
-    const msg = `Kajian baru di ${msq.name}: "${kajian.title}" pada ${fmtDateShort(kajian.date)}`;
-    state.notifications.unshift({message:msg, read:false, timestamp:new Date().toISOString(), type:'new_kajian', kajianId:kajian.id});
-    sendBrowserNotif('Kajian Baru - ' + msq.name, kajian.title);
-    notified = true;
-  }
-  // Check contributor subscription
-  if (submitter && state.subscriptions.contributors.includes(submitter.id) && !notified) {
-    const msg = `${submitter.name} menambahkan kajian baru: "${kajian.title}" pada ${fmtDateShort(kajian.date)}`;
-    state.notifications.unshift({message:msg, read:false, timestamp:new Date().toISOString(), type:'new_kajian', kajianId:kajian.id});
-    sendBrowserNotif('Kajian Baru dari ' + submitter.name, kajian.title);
-  }
-  // Notifikasi ke subscriber ditangani Cloud Function onKajianCreated/onKajianUpdated
-  // Update badge langsung untuk user yang sedang online
-  if (notified) {
-    updateNotificationBadge();
-    injectNavs();
-    if (state.user && fbReady) fsSaveUserData();
-  }
+  // NO-OP: notifikasi ke subscriber (inbox + push) ditangani Cloud Function
+  // onKajianCreated/onKajianUpdated. Versi lokal dulu menimbulkan notif ganda.
+  console.log('[FCM] notifySubscribers: skipped, handled by Cloud Function.');
 }
 
 function toggleSub(type, id) {
@@ -5351,11 +5265,25 @@ function ikHandleRedirectResult() {
   if (u) ikFinishGoogleLogin(u).catch(function (e) { console.warn('sync user error:', e); });
 }
 
+// Hapus token FCM saat logout supaya HP ini berhenti menerima push akun yang
+// dikeluarkan. WAJIB sebelum auth.signOut() karena rules butuh sesi login.
+async function ikRemoveFcmToken(uid){
+  try {
+    if (db && uid && _fcmToken) {
+      await db.collection('userData').doc(uid).set(
+        { fcmTokens: firebase.firestore.FieldValue.arrayRemove(_fcmToken) }, { merge: true });
+    }
+    if (_fcmMessaging) await _fcmMessaging.deleteToken();
+  } catch(e) { console.warn('[FCM] remove token error:', e); }
+  _fcmToken = null;
+}
+
 function doLogout() {
   _ikAuthGeneration++;
   stopUserDataListener();
   ntStopListener();
-  if (auth) auth.signOut();
+  var uid = state.user && state.user.id;
+  if (auth) ikRemoveFcmToken(uid).finally(function(){ auth.signOut(); });
   state.user=null;
   state.bookmarks=[]; state.reminders=[]; state.attendances=[];
   state.notes=[]; state.currentNoteId=null; _ntGuestLoaded=false;
@@ -5446,16 +5374,19 @@ async function initFCM() {
     if (typeof firebase !== 'undefined' && fbReady && !_fcmMessaging) {
       try {
         _fcmMessaging = firebase.messaging();
-        // Handle pesan FCM saat app di foreground
+        // Handle pesan FCM saat app di foreground — pesan kini DATA-ONLY.
+        // Dedup berdasarkan data.id (unik per notif), BUKAN kajianId —
+        // dua notif berbeda untuk kajian yang sama tidak boleh saling buang.
         _fcmMessaging.onMessage(function(payload) {
           var n = payload.notification || {}, d = payload.data || {};
-          var title    = n.title || d.title || 'Info Kajian';
-          var body     = n.body  || d.body  || '';
+          var title    = d.title || n.title || 'Info Kajian';
+          var body     = d.body  || n.body  || '';
+          var nid      = d.id || ikNewNotifId();
           var kajianId = d.kajianId || '';
-          // Hindari duplikat jika Firestore listener sudah menambahkan
-          var exists = kajianId && state.notifications.some(function(x){ return x.kajianId === kajianId; });
+          var exists = state.notifications.some(function(x){ return _notifId(x) === nid; });
           if (!exists) {
             state.notifications.unshift({
+              id:        nid,
               message:   body || title,
               title:     title,
               body:      body,
@@ -5466,7 +5397,6 @@ async function initFCM() {
             });
             updateNotificationBadge();
             injectNavs();
-            if (state.user && fbReady) fsSaveUserData();
           }
           showToast('🔔 ' + title + (body ? ': ' + body.substring(0, 50) : ''), 's', 5000);
         });
@@ -5538,7 +5468,7 @@ function startReminderCheck() {
         var msq  = getMosque(k.mosque_id);
         var title = '⏰ Pengingat Kajian - 1 Jam Lagi!';
         var body  = '"' + k.title + '"' + (spk ? ' oleh ' + spk.full_name : '') + (msq ? ' di ' + msq.name : '') + ' pukul ' + k.time;
-        state.notifications.unshift({ message: title + ' ' + body, read: false, timestamp: new Date().toISOString(), type: 'reminder', kajianId: kajianId });
+        state.notifications.unshift({ id: ikNewNotifId(), message: title + ' ' + body, read: false, timestamp: new Date().toISOString(), type: 'reminder', kajianId: kajianId });
         injectNavs();
         if (state.user && fbReady) fsSaveUserData();
         sendBrowserNotif(title, body);
@@ -5572,49 +5502,14 @@ toggleSub = function(type, id) {
   }
 };
 
-// ── Helper: simpan notifikasi ke Firestore userData user lain (agar muncul saat mereka buka app) ──
+// ── fcmSaveNotifToFirestore — NO-OP: klien tidak boleh menulis userData user lain (rules) ──
 async function fcmSaveNotifToFirestore(userId, notifObj) {
-  if (!db || !userId) return;
-  try {
-    await db.collection('userData').doc(userId).set({
-      notifications: firebase.firestore.FieldValue.arrayUnion(notifObj)
-    }, {merge: true});
-    // Jika ini adalah user yang sedang online, update state lokal juga
-    if (state.user && state.user.id === userId) {
-      var exists = state.notifications.some(function(n){ return n.kajianId === notifObj.kajianId && n.timestamp === notifObj.timestamp; });
-      if (!exists) {
-        state.notifications.unshift(notifObj);
-        updateNotificationBadge();
-        injectNavs();
-      }
-    }
-  } catch(e) { console.warn('[FCM] fcmSaveNotifToFirestore error:', e); }
+  console.log('[FCM] fcmSaveNotifToFirestore: skipped, lintas-user ditangani Cloud Function.');
 }
 
 // ── [F] fcmPushToContributor — NO-OP: Cloud Function yang handle FCM push server-side ──
-// Masih menyimpan ke Firestore agar real-time listener client bisa update badge
 async function fcmPushToContributor(kajian, status) {
-  if (!kajian.submitted_by || !db) return;
-  var title = status === 'approved' ? '✅ Kajian Disetujui' : '❌ Kajian Ditolak';
-  var body  = status === 'approved'
-    ? 'Kajian Anda "' + kajian.title + '" telah disetujui dan dipublikasikan.'
-    : 'Kajian Anda "' + kajian.title + '" ditolak. Silakan periksa dan submit ulang.';
-  // Simpan ke Firestore → real-time listener client akan update badge
-  await fcmSaveNotifToFirestore(kajian.submitted_by, {
-    message:   body,
-    title:     title,
-    body:      body,
-    read:      false,
-    timestamp: new Date().toISOString(),
-    type:      status === 'approved' ? 'kajian_approved' : 'kajian_rejected',
-    kajianId:  kajian.id
-  });
-  // Jika kontributor sedang online & ini adalah akunnya, tampilkan toast
-  if (state.user && state.user.id === kajian.submitted_by) {
-    showToast(title + ': ' + kajian.title, status === 'approved' ? 's' : 'e', 6000);
-  }
-  // FCM push server-side ditangani Cloud Function onKajianUpdated
-  console.log('[FCM] fcmPushToContributor: Firestore saved, CF handles push.');
+  console.log('[FCM] fcmPushToContributor: skipped, handled by Cloud Function onKajianUpdated.');
 }
 
 // ── [F] fcmPushToSubscribers — DEPRECATED (ditangani Cloud Function) ──
