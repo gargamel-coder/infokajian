@@ -1873,13 +1873,14 @@ async function fsSaveUserData() {
   // tanpa guard, notif selamat datang bawaan menimpa seluruh notifikasi lama.
   if (!_userDataLoaded) { console.warn('[UserData] save ditunda: data belum dimuat dari Firestore'); return; }
   try {
-    // Simpan SEMUA field setiap kali — pastikan Firestore selalu punya data lengkap
-    // Ini mencegah snapshot parsial menghapus data yang belum tersimpan
+    // PENTING: notifications TIDAK ikut disimpan di sini. Array itu dikelola
+    // server-side (Cloud Function, arrayUnion) + flag baca di localStorage.
+    // Menulis ulang array penuh dari client bisa menimpa notif yang baru
+    // saja ditambahkan CF di antara snapshot listener dan save ini.
     await db.collection('userData').doc(state.user.id).set({
       bookmarks    : Array.isArray(state.bookmarks)   ? state.bookmarks   : [],
       reminders    : Array.isArray(state.reminders)   ? state.reminders   : [],
       attendances  : Array.isArray(state.attendances) ? state.attendances : [],
-      notifications: Array.isArray(state.notifications) ? state.notifications.slice(0, 50) : [],
       subscriptions: state.subscriptions || { speakers: [], mosques: [], contributors: [] },
     }, {merge:true});
   } catch(e) { console.warn('Save user data error:', e); }
@@ -2013,13 +2014,23 @@ function startUserDataListener(uid) {
       if (Array.isArray(d.reminders))   state.reminders   = d.reminders;
       if (Array.isArray(d.attendances)) state.attendances = d.attendances;
       if (d.subscriptions)              state.subscriptions = d.subscriptions;
-      // Notifikasi: sort terbaru dulu, update badge real-time
+      // Notifikasi: GABUNGKAN (merge by id) server + lokal, sort terbaru dulu.
+      // Jangan menimpa state — notif yang masuk via onMessage FCM (foreground)
+      // atau via arrayUnion CF setelah snapshot terakhir harus tetap ada.
       if (Array.isArray(d.notifications)) {
-        state.notifications = d.notifications.slice().sort(function(a, b) {
+        var server = d.notifications.slice();
+        var seen = {};
+        server.forEach(function(n){ seen[_notifId(n)] = 1; });
+        (state.notifications || []).forEach(function(n){
+          if (!seen[_notifId(n)]) server.push(n);
+        });
+        server.sort(function(a, b) {
           var ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : new Date(a.timestamp || 0).getTime();
           var tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : new Date(b.timestamp || 0).getTime();
           return tb - ta;
         });
+        _notifApplyReadFlags();
+        state.notifications = server;
         updateNotificationBadge();
         injectNavs();
       }
@@ -4212,24 +4223,36 @@ function renderAttendance() {
 // ══════════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// NOTIF READ FLAGS (localStorage — Firestore notifications dikelola server)
+// Karena array notifications di Firestore ditulis server (arrayUnion),
+// status baca TIDAK boleh disimpan dengan menulis ulang array itu.
+// Flag baca disimpan lokal per kajianId/per pesan.
+// ══════════════════════════════════════════
+function _notifReadKey(){ return 'ik_notif_read_' + ((state.user && state.user.id) || 'guest'); }
+function _notifReadSet(){ try { return JSON.parse(localStorage.getItem(_notifReadKey()) || '{}'); } catch(e){ return {}; } }
+function _notifReadSave(m){ try { localStorage.setItem(_notifReadKey(), JSON.stringify(m)); } catch(e){} }
+function _notifId(n){ return n.kajianId || (n.timestamp ? 'ts_' + n.timestamp : (n.message || '')); }
+function _notifApplyReadFlags(){
+  var m = _notifReadSet();
+  (state.notifications || []).forEach(function(n){ if (m[_notifId(n)]) n.read = true; });
+}
+function _notifMarkAllRead(){
+  var m = _notifReadSet();
+  (state.notifications || []).forEach(function(n){ m[_notifId(n)] = 1; n.read = true; });
+  _notifReadSave(m);
+}
+
 function renderNotifs() {
   const el = document.getElementById('notif-list');
   if (!el) return;
+  // Terapkan flag baca lokal, lalu tandai semua unread sebagai read saat layar dibuka
+  _notifApplyReadFlags();
+  var hasUnread = (state.notifications || []).some(function(n){ return !n.read; });
+  if (hasUnread) _notifMarkAllRead();
+  updateNotificationBadge();
+  injectNavs();
   const notifs = state.notifications || [];
-  // Mark semua unread sebagai read saat layar notif dibuka
-  var hasUnread = notifs.some(function(n){ return !n.read; });
-  if (hasUnread) {
-    notifs.forEach(function(n){ n.read = true; });
-    updateNotificationBadge();
-    injectNavs();
-    // Simpan ke Firestore (update array notifications) — hanya bila state SUDAH
-    // dimuat dari Firestore, agar notif selamat datang tidak menimpa yang lama
-    if (state.user && db && fbReady && _userDataLoaded) {
-      db.collection('userData').doc(state.user.id)
-        .set({ notifications: notifs }, { merge: true })
-        .catch(function(e){ console.warn('[Notif] mark-read error:', e); });
-    }
-  }
   if (!notifs.length) {
     el.innerHTML = emptyStateHTML('bell','Belum ada notifikasi','Subscribe speaker atau masjid favoritmu untuk update kajian terbaru');
     injectNavs();
@@ -4251,15 +4274,14 @@ function renderNotifs() {
   injectNavs();
 }
 function markRead(i) {
-  if (state.notifications[i]) state.notifications[i].read = true;
+  var n = state.notifications[i];
+  if (n) { n.read = true; var m=_notifReadSet(); m[_notifId(n)]=1; _notifReadSave(m); }
   renderNotifs();
-  if (state.user && fbReady) fsSaveUserData();
 }
 function markAllRead() {
-  (state.notifications || []).forEach(function(n){ n.read = true; });
+  _notifMarkAllRead();
   updateNotificationBadge();
   renderNotifs();
-  if (state.user && fbReady) fsSaveUserData();
   showToast('Semua notifikasi dibaca','s');
 }
 
