@@ -2007,7 +2007,10 @@ function startRealtimeListeners() {
 function startUserDataListener(uid) {
   if (!db || !uid) return;
   stopUserDataListener();
+  ikHydrateNotifCache(uid);
+  const generation = _ikAuthGeneration;
   _userDataUnsub = db.collection('userData').doc(uid).onSnapshot(function(doc) {
+    if (generation !== _ikAuthGeneration || !state.user || state.user.id !== uid) return;
     if (doc.exists) {
       var d = doc.data();
       // PENTING: hanya update field yang ADA di snapshot
@@ -2032,6 +2035,8 @@ function startUserDataListener(uid) {
           return tb - ta;
         });
         state.notifications = server;
+        ikSaveNotifCache(uid);
+        if (screenHistory[screenHistory.length - 1] === 'notif') renderNotifs();
         _notifApplyReadFlags();
         updateNotificationBadge();
         injectNavs();
@@ -4243,6 +4248,22 @@ function renderAttendance() {
 // status baca TIDAK boleh disimpan dengan menulis ulang array itu.
 // Flag baca disimpan lokal per kajianId/per pesan.
 // ══════════════════════════════════════════
+// Cache privat per akun; tidak dipakai sebelum identitas login diketahui.
+function ikSaveNotifCache(uid){
+  if (!uid || !state.user || state.user.id !== uid) return;
+  try { localStorage.setItem('ik-inbox-v1:' + uid, JSON.stringify({uid:uid,items:state.notifications})); } catch(e) { console.warn('Cache inbox tidak tersimpan'); }
+}
+function ikHydrateNotifCache(uid){
+  if (!uid || !state.user || state.user.id !== uid) return;
+  try {
+    const cached = JSON.parse(localStorage.getItem('ik-inbox-v1:' + uid) || 'null');
+    if (!cached || cached.uid !== uid || !Array.isArray(cached.items) || !cached.items.every(n=>n && typeof n==='object')) return;
+    state.notifications = cached.items;
+    _notifApplyReadFlags();
+    updateNotificationBadge();
+    if (screenHistory[screenHistory.length - 1] === 'notif') renderNotifs();
+  } catch(e) { /* Cache rusak tidak boleh menghalangi sinkronisasi server. */ }
+}
 function _notifReadKey(){ return 'ik_notif_read_' + ((state.user && state.user.id) || 'guest'); }
 function _notifReadSet(){ try { return JSON.parse(localStorage.getItem(_notifReadKey()) || '{}'); } catch(e){ return {}; } }
 function _notifReadSave(m){ try { localStorage.setItem(_notifReadKey(), JSON.stringify(m)); } catch(e){} }
