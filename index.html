@@ -1888,7 +1888,9 @@ async function fsSaveUserData() {
 async function fsLoadUserData(uid) {
   if (!db) return;
   try {
+    const generation = _ikAuthGeneration;
     const doc = await db.collection('userData').doc(uid).get();
+    if (generation !== _ikAuthGeneration || !state.user || state.user.id !== uid) return;
     if (doc.exists) {
       const d = doc.data();
       // Hanya update field yang ada — jangan hapus data lokal yang belum tersimpan
@@ -1901,7 +1903,7 @@ async function fsLoadUserData(uid) {
     // Jika fresh user (doc tidak exist), state sudah diinisialisasi default di awal
     _userDataLoaded = true;
     updateNotificationBadge();
-  } catch(e) { console.warn('Load user data error:', e); _userDataLoaded = true; }
+  } catch(e) { console.warn('Load user data error:', e); /* Tetap terkunci bila pemuatan gagal. */ }
 }
 // Flag: apakah userData (notifications/bookmarks/dll) SUDAH dimuat dari Firestore
 // untuk sesi login ini. Direset saat logout / ganti pengguna.
@@ -5063,10 +5065,10 @@ async function ikFinishGoogleLogin(user) {
   state.user = {id:uid,email:user.email||'',name:user.displayName||'Pengguna',photo:user.photoURL||'',role:trustedAdmin?'admin':'user'};
   _userDataLoaded = false;
   startUserDataListener(uid);
-  // Muat userData (notifications/bookmarks/dll) SEBELUM state bisa menimpa Firestore
-  await fsLoadUserData(uid);
-  ntStartListener(uid);
+  // Autentikasi sudah sah: navigasi tidak menunggu jaringan Firestore.
   goScreen('home'); renderHome(); injectNavs();
+  ntStartListener(uid);
+  void fsLoadUserData(uid);
   let u = DB.users.find(x => x.id === uid);
   if (!u) {
     try {

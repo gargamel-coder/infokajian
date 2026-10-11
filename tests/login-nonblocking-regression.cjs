@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('index.html','utf8');
+const start=source.indexOf('async function ikFinishGoogleLogin(');
+const end=source.indexOf('\n/*',start);
+const user={uid:'test',email:'test@example.invalid',displayName:'Uji',emailVerified:true};
+const screens=[];
+const ctx={auth:{currentUser:user},_ikAuthGeneration:1,state:{},DB:{users:[]},_userDataLoaded:false,startUserDataListener(){},fsLoadUserData:()=>new Promise(()=>{}),ntStartListener(){},goScreen:s=>screens.push(s),renderHome(){},injectNavs(){},db:{collection:()=>({doc:()=>({get:()=>new Promise(()=>{})})})},console};
+vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ctx.ikFinishGoogleLogin(user);
+assert.ok(screens.includes('home'),'Login tidak boleh menunggu pembacaan Firestore');
+console.log('LULUS: halaman masuk tampil ketika Firestore belum merespons');
