@@ -2885,6 +2885,7 @@ function renderMosques(){
 
 function ikOpenMaps(lat,lng,name){
   if(lat==null||lng==null){ showToast('Koordinat masjid belum tersedia','w'); return; }
+  try{ if(window.IKAnalytics)IKAnalytics.track('maps','m-'+String(name||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)); }catch(e){}
   const q=encodeURIComponent((name||'Masjid')+' '+lat+','+lng);
   window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank');
 }
@@ -4059,7 +4060,7 @@ function confirmAttend(id) {
 function toggleBookmarkById(id) {
   const i = state.bookmarks.indexOf(id);
   if(i>-1) { state.bookmarks.splice(i,1); showToast('Dihapus dari simpanan','i'); }
-  else { state.bookmarks.push(id); showToast('Kajian disimpan ✓','s'); }
+  else { state.bookmarks.push(id); showToast('Kajian disimpan ✓','s'); try{ if(window.IKAnalytics)IKAnalytics.track('bookmark','k-'+String(id).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)); }catch(e){} }
   fsSaveUserData();
 }
 function toggleReminderById(id) {
@@ -4549,7 +4550,7 @@ function toggleSub(type, id) {
   const arr = state.subscriptions[type];
   const i = arr.indexOf(id);
   if (i > -1) { arr.splice(i, 1); showToast('Berhenti mengikuti','i'); }
-  else { arr.push(id); showToast('Berhasil mengikuti! ✓','s'); }
+  else { arr.push(id); showToast('Berhasil mengikuti! ✓','s'); try{ if(window.IKAnalytics)IKAnalytics.track('follow',(type==='speakers'?'s-':type==='mosques'?'m-':'u-')+String(id).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)); }catch(e){} }
   if (state.user && fbReady) fsSaveUserData();
   renderSubscriptions();
 }
@@ -4716,14 +4717,32 @@ function openAnalyticsPanel(host) {
   if(!state.user || state.user.role!=='admin'){host.textContent='Analitik khusus admin.';return;}
   host.textContent='Memuat analitik…';
   if(!analyticsPanelLoad) analyticsPanelLoad=new Promise(function(resolve,reject){
-    var script=document.createElement('script');script.src='/analytics-admin.js';script.async=true;
-    script.onload=resolve;script.onerror=function(){script.remove();analyticsPanelLoad=null;reject(new Error('load'));};
-    document.head.appendChild(script);
+    var done=0;
+    function ok(){ if(++done===2)resolve(); }
+    ['analytics-core.js','analytics-admin.js'].forEach(function(f){
+      var script=document.createElement('script');script.src='/'+f;script.async=true;
+      script.onload=ok;script.onerror=function(){script.remove();analyticsPanelLoad=null;reject(new Error('load '+f));};
+      document.head.appendChild(script);
+    });
   });
   analyticsPanelLoad.then(function(){
     if(state.adminTab!=='analytics')return;
     IKAnalyticsAdmin.render(host,{admin:!!(state.user && state.user.role==='admin')});
   }).catch(function(){if(state.adminTab==='analytics')host.textContent='Analitik gagal dimuat. Buka ulang tab untuk mencoba lagi.';});
+}
+// ── Telemetri opt-in (login-only, nonblocking) ──
+function ikLoadAnalyticsTracker(){
+  if(root.__ikTrackerLoad)return root.__ikTrackerLoad;
+  if(!window.IKAnalyticsCore){
+    var core=document.createElement('script');core.src='/analytics-core.js';core.async=true;
+    var trk=document.createElement('script');trk.src='/analytics-tracker.js';trk.async=true;
+    root.__ikTrackerLoad=new Promise(function(resolve){
+      core.onload=resolve;trk.onload=resolve;
+      document.head.appendChild(core);document.head.appendChild(trk);
+    });
+    return root.__ikTrackerLoad;
+  }
+  return Promise.resolve();
 }
 function setAdminTab(tab,btn) {
   state.adminTab=tab;
@@ -4776,6 +4795,19 @@ function setAdminTab(tab,btn) {
       </div>`;
     }).join(''));
   }
+}
+// ── Persetujuan analitik (opt-in) ──
+function ikToggleAnalyticsConsent(){
+  if(!state.user){showToast('Login diperlukan','i');return;}
+  var cur=false; try{cur=localStorage.getItem('ik_analytics_consent')==='1';}catch(e){}
+  ikLoadAnalyticsTracker().then(function(){
+    if(window.IKAnalytics){
+      IKAnalytics.setConsent(!cur);
+      if(!cur)IKAnalytics.start();
+      showToast(!cur?'Statistik penggunaan diaktifkan. Terima kasih!':'Statistik penggunaan dimatikan.', !cur?'s':'i');
+      renderProfile();
+    }
+  }).catch(function(){showToast('Gagal mengubah pengaturan','e');});
 }
 function adminSearchSet(v){
   state.adminSearch=state.adminSearch||{};
@@ -5124,6 +5156,10 @@ function renderProfile() {
       <div class="menu-icon" style="background:linear-gradient(135deg,#FCE4EC,#F48FB1)"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" fill="#C2185B"/><path d="M10 3h4" stroke="#C2185B" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="21" r="1" fill="#C2185B"/></svg></div>
       <span class="menu-label">Langganan Notifikasi</span><span class="menu-badge">${state.subscriptions.speakers.length+state.subscriptions.mosques.length+state.subscriptions.contributors.length}</span>${iconSVG('chevron','var(--muted)',16)}
     </button>
+    <button class="menu-item" onclick="ikToggleAnalyticsConsent()">
+      <div class="menu-icon" style="background:linear-gradient(135deg,#E0F7FA,#80DEEA)"><svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M3 3h18v18H3z" fill="${(function(){try{return localStorage.getItem('ik_analytics_consent')==='1'?'#00838F':'#B0BEC5';}catch(e){return '#B0BEC5';}}())}"/><path d="M7 12l3 3 7-7" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <span class="menu-label">Statistik Penggunaan ${(function(){try{return localStorage.getItem('ik_analytics_consent')==='1'?'(Aktif)':'(Nonaktif)';}catch(e){return '(Nonaktif)';}}())}</span>${iconSVG('chevron','var(--muted)',16)}
+    </button>
     <button class="menu-item" onclick="requireLogin(()=>goScreen('badges'))">
       <div class="menu-icon" style="background:linear-gradient(135deg,#FFF8E1,#FFCC80);font-size:20px">🏅</div>
       <span class="menu-label">Badge & Streak</span>
@@ -5203,6 +5239,8 @@ async function ikFinishGoogleLogin(user) {
   state.user = u;
   showToast('Selamat datang, ' + ((u.name || u.email || '').split(' ')[0]) + '!', 's');
   goScreen('home'); renderHome(); injectNavs();
+  // Telemetri opt-in: mulai tracker bila pengguna sudah menyetujui. Nonblocking.
+  ikLoadAnalyticsTracker().then(function(){ if(window.IKAnalytics)IKAnalytics.start(); }).catch(function(){});
   if (state.notifPermission === 'granted') {
     setTimeout(async function () { await initFCM(); await getFCMTokenAndSave(); }, 1000);
   }
