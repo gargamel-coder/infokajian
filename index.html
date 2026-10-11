@@ -1373,6 +1373,7 @@ function showBanner() {
         <button class="tab" onclick="setAdminTab('speakers',this)">Pembicara</button>
         <button class="tab" onclick="setAdminTab('mosques',this)">Masjid</button>
         <button class="tab" onclick="setAdminTab('users',this)">Pengguna</button>
+        <button class="tab" onclick="setAdminTab('analytics',this)">Analitik</button>
       </div>
     </div>
     <div class="screen-content" style="padding:16px"><div id="admin-content"></div></div>
@@ -4717,19 +4718,28 @@ function setAdminTab(tab,btn) {
   else { var tabMap={'kajian':0,'speakers':1,'mosques':2,'users':3}; var tabEl=document.querySelectorAll('#admin-tabs .tab')[tabMap[tab]]; if(tabEl)tabEl.classList.add('active'); }
   const c=document.getElementById('admin-content');
   if(!c)return;
+  // Pencarian admin: filter lokal dari data yang sudah dimuat, tanpa panggilan jaringan.
+  var _q=(state.adminSearch&&typeof state.adminSearch==='object')?state.adminSearch:{};
+  if(_q.tab!==tab){_q.tab=tab;_q.text='';}
+  var q=(_q.text||'').trim().toLowerCase();
+  var searchBar='<div style="display:flex;gap:8px;margin-bottom:12px"><input id="adminSearchInput" type="search" placeholder="Cari…" value="'+String(_q.text||'').replace(/"/g,'&quot;')+'" oninput="adminSearchSet(this.value)" style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px"><button onclick="adminSearchClear()" style="border:1.5px solid var(--border);background:#fff;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">Reset</button></div>';
+  var match=t=>!q||t.toLowerCase().includes(q);
   if(tab==='kajian'){
     const pend=DB.kajian.filter(k=>k.status==='pending');
-    c.innerHTML=(pend.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">⏳ Menunggu Review (${pend.length})</p>`+pend.map(k=>{const spk=getSpeaker(k.speaker_id),msq=getMosque(k.mosque_id);return`<div class="card" style="padding:14px;margin-bottom:10px"><p style="font-weight:700;font-size:14px;margin-bottom:4px">${k.title}</p><p style="font-size:12px;color:var(--muted);margin-bottom:10px">${(spk&&spk.full_name)||''} · ${(msq&&msq.name)||''} · ${fmtDateShort(k.date)}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-p btn-xs" onclick="adminApprove('${k.id}')">✓ Setujui</button><button class="btn btn-d btn-xs" onclick="adminReject('${k.id}')">✕ Tolak</button><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join(''):'')+`<p style="font-weight:700;font-size:14px;margin-bottom:10px;margin-top:${pend.length?16:0}px">Semua Kajian</p>`+[...DB.kajian].sort(byNewest).map(k=>{const spk=getSpeaker(k.speaker_id),sc=STATUS[k.status]||STATUS.pending;return`<div class="card" style="padding:12px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><div style="flex:1"><p style="font-weight:600;font-size:13px">${k.title}</p><p style="font-size:11px;color:var(--muted)">${(spk&&spk.full_name)||''} · ${fmtDateShort(k.date)}</p></div><span class="tag ${sc.cls}">${sc.label}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select onchange="adminSetStatus('${k.id}',this.value)" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:3px 6px;background:#fff;color:var(--text)">${Object.keys(STATUS).map(function(v){return '<option value="'+v+'" '+(k.status===v?'selected':'')+'>'+STATUS[v].label+'</option>';}).join('')}</select><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join('');
+    const all=[...DB.kajian].sort(byNewest).filter(k=>match(k.title+' '+((getSpeaker(k.speaker_id)||{}).full_name||'')+' '+((getMosque(k.mosque_id)||{}).name||'')));
+    c.innerHTML=searchBar+(pend.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">⏳ Menunggu Review (${pend.length})</p>`+pend.map(k=>{const spk=getSpeaker(k.speaker_id),msq=getMosque(k.mosque_id);return`<div class="card" style="padding:14px;margin-bottom:10px"><p style="font-weight:700;font-size:14px;margin-bottom:4px">${k.title}</p><p style="font-size:12px;color:var(--muted);margin-bottom:10px">${(spk&&spk.full_name)||''} · ${(msq&&msq.name)||''} · ${fmtDateShort(k.date)}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-p btn-xs" onclick="adminApprove('${k.id}')">✓ Setujui</button><button class="btn btn-d btn-xs" onclick="adminReject('${k.id}')">✕ Tolak</button><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join(''):'')+`<p style="font-weight:700;font-size:14px;margin-bottom:10px;margin-top:${pend.length?16:0}px">Semua Kajian${q?` — hasil “${q}” (${all.length})`:''}</p>`+all.map(k=>{const spk=getSpeaker(k.speaker_id),sc=STATUS[k.status]||STATUS.pending;return`<div class="card" style="padding:12px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><div style="flex:1"><p style="font-weight:600;font-size:13px">${k.title}</p><p style="font-size:11px;color:var(--muted)">${(spk&&spk.full_name)||''} · ${fmtDateShort(k.date)}</p></div><span class="tag ${sc.cls}">${sc.label}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap"><select onchange="adminSetStatus('${k.id}',this.value)" style="font-size:11px;border:1px solid var(--border);border-radius:8px;padding:3px 6px;background:#fff;color:var(--text)">${Object.keys(STATUS).map(function(v){return '<option value="'+v+'" '+(k.status===v?'selected':'')+'>'+STATUS[v].label+'</option>';}).join('')}</select><button onclick="adminEditKajian('${k.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Edit</button><button onclick="confirmDelete('kajian','${k.id}','${encodeURIComponent(k.title)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer">Hapus</button></div></div>`;}).join('');
   }
   if(tab==='speakers'){
     const unv=DB.speakers.filter(s=>!s.verified);
-    c.innerHTML=(unv.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">Belum Terverifikasi</p>`+unv.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${s.normalized_name}</p></div><button class="btn btn-p btn-xs" onclick="adminVerifySpk('${s.id}')">Verifikasi</button></div>`).join(''):'')+`<p style="font-weight:700;font-size:14px;margin:${unv.length?16:0}px 0 10px">Semua Pembicara (${DB.speakers.length})</p>`+[...DB.speakers].sort(byNewest).map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${DB.kajian.filter(k=>k.speaker_id===s.id).length} kajian</p></div><span class="tag ${s.verified?'tag-g':'tag-x'}">${s.verified?'✓ Verified':'Belum'}</span><button onclick="confirmDelete('speaker','${s.id}','${encodeURIComponent(s.full_name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
+    const all=[...DB.speakers].sort(byNewest).filter(s=>match(s.full_name));
+    c.innerHTML=searchBar+(unv.length>0?`<p style="font-weight:700;font-size:14px;color:var(--warn);margin-bottom:10px">Belum Terverifikasi</p>`+unv.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${s.normalized_name}</p></div><button class="btn btn-p btn-xs" onclick="adminVerifySpk('${s.id}')">Verifikasi</button></div>`).join(''):'')+`<p style="font-weight:700;font-size:14px;margin:${unv.length?16:0}px 0 10px">Semua Pembicara${q?` — hasil “${q}” (${all.length})`:''} (${DB.speakers.length})</p>`+all.map(s=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${s.full_name}</p><p style="font-size:11px;color:var(--muted)">${DB.kajian.filter(k=>k.speaker_id===s.id).length} kajian</p></div><span class="tag ${s.verified?'tag-g':'tag-x'}">${s.verified?'✓ Verified':'Belum'}</span><button onclick="confirmDelete('speaker','${s.id}','${encodeURIComponent(s.full_name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
   }
   if(tab==='mosques'){
-    c.innerHTML=[...DB.mosques].sort(byNewest).map(m=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${m.name}</p><p style="font-size:11px;color:var(--muted)">${m.city}</p></div>${!m.verified?`<button class="btn btn-p btn-xs" onclick="adminVerifyMq('${m.id}')">Verifikasi</button>`:`<span class="tag tag-g">✓</span>`}<button onclick="confirmDelete('mosque','${m.id}','${encodeURIComponent(m.name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
+    const all=[...DB.mosques].sort(byNewest).filter(m=>match(m.name+' '+(m.city||'')+' '+(m.address||'')));
+    c.innerHTML=searchBar+`<p style="font-weight:700;font-size:14px;margin-bottom:10px">Semua Masjid${q?` — hasil “${q}” (${all.length})`:''} (${DB.mosques.length})</p>`+all.map(m=>`<div class="card" style="padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px"><div style="flex:1"><p style="font-weight:600;font-size:14px">${m.name}</p><p style="font-size:11px;color:var(--muted)">${m.city}${m.lat!=null?' · '+m.lat+', '+m.lng:''}</p></div>${!m.verified?`<button class="btn btn-p btn-xs" onclick="adminVerifyMq('${m.id}')">Verifikasi</button>`:`<span class="tag tag-g">✓</span>`}<button onclick="adminEditMq('${m.id}')" style="border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Edit</button><button onclick="confirmDelete('mosque','${m.id}','${encodeURIComponent(m.name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button></div>`).join('');
   }
   if(tab==='users'){
-    var safeUsers = Array.isArray(DB.users) ? [...DB.users].sort(byNewest) : [];
+    var safeUsers = Array.isArray(DB.users) ? [...DB.users].sort(byNewest).filter(u=>match((u.name||'')+' '+(u.email||''))) : [];
     c.innerHTML=`<p style="font-weight:700;font-size:14px;margin-bottom:10px">Daftar Pengguna (${safeUsers.length})</p>`+(safeUsers.length===0?'<p style="font-size:13px;color:var(--muted);text-align:center;padding:24px 0">Belum ada pengguna terdaftar.</p>':safeUsers.map(u=>{
       const name = (u.name||u.email||'(tanpa nama)');
       const email = u.email||'-';
@@ -4750,6 +4760,67 @@ function setAdminTab(tab,btn) {
         ${(!isSelf && !isAdmin) ? `<button onclick="confirmDelete('user','${u.id}','${encodeURIComponent(name)}')" style="border:1.5px solid var(--danger);color:var(--danger);background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Hapus</button>` : ''}
       </div>`;
     }).join(''));
+  }
+}
+function adminSearchSet(v){
+  state.adminSearch=state.adminSearch||{};
+  state.adminSearch.tab=state.adminTab;
+  state.adminSearch.text=String(v==null?'':v).slice(0,100);
+  setAdminTab(state.adminTab,null);
+  var inp=document.getElementById('adminSearchInput');
+  if(inp){inp.focus();var L=inp.value.length;try{inp.setSelectionRange(L,L);}catch(e){}}
+}
+function adminSearchClear(){
+  state.adminSearch={tab:state.adminTab,text:''};
+  setAdminTab(state.adminTab,null);
+}
+function adminEditMq(id){
+  if(!state.user||state.user.role!=='admin'){showToast('Khusus admin','e');return;}
+  const m=DB.mosques.find(x=>x.id===id);
+  if(!m){showToast('Masjid tidak ditemukan','e');return;}
+  const f=(l,v)=>'<label style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">'+l+'</label><input id="adm-mq-'+l.toLowerCase()+'" value="'+String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')+'" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px">';
+  document.getElementById('admin-mq-body').innerHTML=f('Nama',m.name)+f('Alamat',m.address)+f('Kota',m.city)+f('Kecamatan',m.district)+'<div style="display:flex;gap:8px">'+f('Lat',m.lat)+f('Lng',m.lng)+'</div><p id="adm-mq-err" style="color:var(--danger);font-size:12px;margin:8px 0 0;min-height:14px"></p>';
+  document.getElementById('adm-mq-save').onclick=function(){adminSaveMq(id,{
+    name:document.getElementById('adm-mq-nama').value,
+    address:document.getElementById('adm-mq-alamat').value,
+    city:document.getElementById('adm-mq-kota').value,
+    district:document.getElementById('adm-mq-kecamatan').value,
+    lat:document.getElementById('adm-mq-lat').value,
+    lng:document.getElementById('adm-mq-lng').value});};
+  openModal('modal-mq');
+}
+async function adminSaveMq(id,form){
+  if(!state.user||state.user.role!=='admin'){showToast('Khusus admin','e');return {ok:false};}
+  const m=DB.mosques.find(x=>x.id===id);
+  if(!m)return {ok:false,error:'Masjid tidak ditemukan.'};
+  const errEl=document.getElementById('adm-mq-err');
+  const fail=msg=>{if(errEl)errEl.textContent=msg;showToast(msg,'e');return {ok:false,error:msg};};
+  const name=String(form.name||'').trim();
+  if(!name)return fail('Nama wajib diisi.');
+  const lat=String(form.lat==null?'':form.lat).trim(), lng=String(form.lng==null?'':form.lng).trim();
+  if((lat==='')!==(lng===''))return fail('Isi kedua koordinat atau kosongkan keduanya.');
+  const upd={name:name,address:String(form.address||'').trim(),city:String(form.city||'').trim(),district:String(form.district||'').trim()};
+  if(lat!==''){
+    const a=parseFloat(lat),b=parseFloat(lng);
+    if(!isFinite(a)||a<-90||a>90||!isFinite(b)||b<-180||b>180)return fail('Koordinat tidak valid (lat -90..90, lng -180..180).');
+    upd.lat=a;upd.lng=b;
+  }
+  const btn=document.getElementById('adm-mq-save');
+  if(btn){btn.disabled=true;}
+  try{
+    suppressSnapshotFor(3000);
+    const updated=Object.assign({},m,upd);
+    await fsSet('mosques',m.id,updated);
+    Object.assign(m,upd);
+    closeModal('modal-mq');
+    showToast('Masjid diperbarui','s');
+    if(state.adminTab==='mosques')setAdminTab('mosques',null);
+    return {ok:true};
+  }catch(e){
+    console.warn('adminSaveMq error:',e);
+    return fail('Gagal menyimpan. Coba lagi.');
+  }finally{
+    if(btn)btn.disabled=false;
   }
 }
 function adminApprove(id){
@@ -7323,6 +7394,22 @@ function toggleReminder() {
       </div>
       <button class="btn btn-p" onclick="closeModal('modal-login-nudge');goScreen('login')" style="margin-bottom:10px">Login Sekarang</button>
       <button class="btn btn-o" onclick="closeModal('modal-login-nudge')">Nanti Saja</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Masjid (admin) -->
+<div id="modal-mq" class="overlay" onclick="closeModal('modal-mq')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="padding:0 8px">
+      <p style="text-align:center;font-weight:700;font-size:17px;margin-bottom:4px">Edit Masjid</p>
+      <p style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:8px">Kosongkan kedua koordinat untuk mempertahankan nilai lama.</p>
+      <div id="admin-mq-body"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-o" onclick="closeModal('modal-mq')">Batal</button>
+        <button id="adm-mq-save" class="btn btn-p">Simpan</button>
+      </div>
     </div>
   </div>
 </div>
