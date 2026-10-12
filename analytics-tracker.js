@@ -1,10 +1,8 @@
-/* Telemetri opt-in Info Kajian.
-   Hanya pengguna login non-admin yang menyetujui. Antrean tetap ada saat jaringan gagal. */
+/* Telemetri agregat Info Kajian.
+   Aktif otomatis untuk pengguna login non-admin; tamu dan admin tidak dicatat. */
 (function(root){
  'use strict';
- var LS_CONSENT='ik_analytics_consent';
  var collector=null,flushTimer=null,flushing=null,pending=[],identity='',startedIdentity='';
- function consent(){try{return localStorage.getItem(LS_CONSENT)==='1';}catch(e){return false;}}
  function context(){try{return root.ikAnalyticsContext?root.ikAnalyticsContext():{};}catch(e){return {};}}
  function user(ctx){return ctx&&ctx.user||null;}
  function uid(ctx){var u=user(ctx);return u&&u.id||'';}
@@ -12,7 +10,7 @@
  function idGen(){return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
  function ensureCollector(){
   if(!root.IKAnalyticsCore)return false;
-  var ctx=context(),next=uid(ctx),allowed=consent()&&!!next&&!admin(ctx);
+  var ctx=context(),next=uid(ctx),allowed=!!next&&!admin(ctx);
   if(next!==identity||!allowed){pending=[];startedIdentity='';}
   identity=next;
   if(!collector)collector=root.IKAnalyticsCore.createCollector({now:function(){return Date.now();},id:idGen});
@@ -56,9 +54,5 @@
   }
   if(!root.__ikUnloadPatched){root.__ikUnloadPatched=true;root.addEventListener('beforeunload',function(){if(collector&&collector.size()||pending.length)flush();});}
  }
- function setConsent(v){
-  try{if(v)localStorage.setItem(LS_CONSENT,'1');else localStorage.removeItem(LS_CONSENT);}catch(e){}
-  ensureCollector();if(v)start();
- }
- root.IKAnalytics={consent:consent,setConsent:setConsent,track:track,start:start,flush:flush,_collector:function(){return collector;},_pendingSize:function(){return pending.length;}};
+ root.IKAnalytics={track:track,start:start,flush:flush,_collector:function(){return collector;},_pendingSize:function(){return pending.length;}};
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -4,5 +4,5 @@ test('panel dimuat sesuai permintaan, menolak tamu, dan menjelaskan batas statis
  const src=fs.readFileSync('analytics-admin.js','utf8'),x={module:{exports:{}}};vm.runInNewContext(src,x);
  const nodes={},host={textContent:'',innerHTML:'',querySelector:id=>nodes[id]||(nodes[id]={})};
  x.module.exports.render(host,{admin:false});assert.match(host.textContent,/khusus admin/i);
- x.module.exports.render(host,{admin:true});assert.match(host.innerHTML,/Bukan seluruh trafik/);assert.match(host.innerHTML,/Belum dimuat/);assert.match(host.innerHTML,/Ekspor CSV/);assert.equal(typeof nodes['#ik-an-refresh'].onclick,'function');
+ x.module.exports.render(host,{admin:true});assert.match(host.innerHTML,/Otomatis untuk pengguna login non-admin/);assert.match(host.innerHTML,/Belum dimuat/);assert.match(host.innerHTML,/Ekspor CSV/);assert.equal(typeof nodes['#ik-an-refresh'].onclick,'function');
 });

@@ -20,10 +20,8 @@ vm.createContext(ctx);
 vm.runInContext(coreSrc,ctx);vm.runInContext(trackerSrc,ctx);vm.runInContext(adminSrc,ctx);
 (async()=>{
  const IK=ctx.IKAnalytics;
- // 1. Sebelum consent: track diabaikan (collector belum dibuat — null adalah normal)
- IK.track('pageview','home');assert.ok(!IK._collector() || IK._collector().size()===0,'tanpa consent tidak ada antrean');
- // 2. Set consent → pageview tercatat
- IK.setConsent(true);
+ // 1. Pengguna login non-admin langsung dicatat tanpa persetujuan lokal
+ IK.start();
  IK.track('pageview','home');IK.track('kajian','k-abc');IK.track('bookmark','k-abc');
  assert.ok(IK._collector() && IK._collector().size()>=1);
  // 3. Flush → tulis ke batch (stub) sebelum identitas berubah
@@ -33,16 +31,16 @@ vm.runInContext(coreSrc,ctx);vm.runInContext(trackerSrc,ctx);vm.runInContext(adm
  // 4. Admin ditolak
  ctx.state.user={id:'adm',role:'admin'};
  IK.track('pageview','home'); // harus diabaikan
- // 5. Withdraw consent: antrean dibuang
+ // 5. Pergantian akun membuang antrean akun sebelumnya
  ctx.state.user={id:'u2',role:'user'};
- IK.track('pageview','home');IK.setConsent(false);assert.ok(!IK._collector() || IK._collector().size()===0);
+ IK.track('pageview','home');assert.ok(IK._collector() && IK._collector().size()===1);
  // 6. Dashboard: render dari data sintetis (admin)
  ctx.state.user={id:'adm',role:'admin'};
  let host={innerHTML:'',querySelector:sel=>({onclick(){},disabled:false}),querySelectorAll:()=>[]};
- IK.setConsent(true);
+
  // panggil render admin langsung dengan data fake di root.db? gunakan summarize dari core utk konten
  const summary=ctx.IKAnalyticsCore.summarize([{uid:'u1',session:'s1',kind:'pageview',target:'home',count:3,clientTime:Date.now()}],{now:Date.now()});
  assert.equal(summary.today.pageviews,3);assert.equal(summary.active.dau,1);
  assert.equal(typeof summary.today.date,'string');
- console.log('LULUS: dry run E2E analitik — consent, batching, admin exclusion, withdraw, summarize');
+ console.log('LULUS: dry run E2E analitik — otomatis login, batching, admin exclusion, isolasi akun, summarize');
 })().catch(e=>{console.error('GAGAL:',e.message);process.exit(1);});

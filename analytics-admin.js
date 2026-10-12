@@ -11,7 +11,7 @@
   host.innerHTML=
    '<section class="card" style="padding:16px;margin-bottom:12px">'
    +'<p style="font-weight:800;font-size:15px;margin-bottom:6px">Analitik Pengunjung</p>'
-   +'<p style="font-size:12px;color:var(--muted);line-height:1.6">Opt-in, hanya pengguna login, sejak tracking aktif. Bukan seluruh trafik; tamu &amp; tanpa persetujuan tidak tercatat. Jangan sajikan angka ini sebagai total pengguna aplikasi.</p>'
+   +'<p style="font-size:12px;color:var(--muted);line-height:1.6">Otomatis untuk pengguna login non-admin sejak tracking aktif. Tamu dan admin tidak tercatat. Jangan sajikan angka ini sebagai total seluruh pengunjung aplikasi.</p>'
    +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
    +'<button id="ik-an-refresh" class="btn btn-p btn-sm">Muat Data</button>'
    +'<button id="ik-an-export" class="btn btn-o btn-sm" disabled>Ekspor CSV</button>'

@@ -1,4 +1,4 @@
-/* Opt-in analytics primitives. No I/O, no Firebase or DOM dependency. */
+/* Analytics primitives. No I/O, no Firebase or DOM dependency. */
 (function(root){
  'use strict';
  function createCollector(options){
@@ -42,7 +42,7 @@
    }else if(['follow','bookmark','maps'].includes(e.kind)){actions[e.kind]=(actions[e.kind]||0)+e.count;}
    else {var key=e.kind+':'+e.target;var r=top.get(key)||{kind:e.kind,target:e.target,count:0};r.count+=e.count;top.set(key,r);}
   });
-  return {timezone:'Asia/Jakarta',basis:'Opt-in login; 30 hari kalender, waktu klien; bukan seluruh trafik',partial:events.length>=5000,today:{date:today,visitors:users.size,sessions:sessions.size,pageviews:views},active:{dau:users.size,wau:week.size,mau:month.size},trend:trend,hours:hours,actions:actions,top:Array.from(top.values()).sort(function(a,b){return b.count-a.count;}).slice(0,20),duration:null,guests:null,source:null,region:null,newReturning:null};
+  return {timezone:'Asia/Jakarta',basis:'Pengguna login non-admin; 30 hari kalender, waktu klien; tamu tidak tercatat',partial:events.length>=5000,today:{date:today,visitors:users.size,sessions:sessions.size,pageviews:views},active:{dau:users.size,wau:week.size,mau:month.size},trend:trend,hours:hours,actions:actions,top:Array.from(top.values()).sort(function(a,b){return b.count-a.count;}).slice(0,20),duration:null,guests:null,source:null,region:null,newReturning:null};
  }
  var api={createCollector:createCollector,summarize:summarize};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.IKAnalyticsCore=api;
