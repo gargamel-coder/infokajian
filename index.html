@@ -1826,6 +1826,7 @@ function _onFirebaseReady() {
           u = Object.assign({}, u, {role:user.emailVerified && user.email==='syahlanxzaelani@gmail.com'?'admin':(u.role==='contributor'?'contributor':'user')});
           var _prevUid = state.user && state.user.id;
           state.user = u;
+          ikStartAnalyticsIfConsented();
           if (_prevUid !== user.uid) {
             _userDataLoaded = false;
             startUserDataListener(user.uid);
@@ -2528,6 +2529,7 @@ function openKajian(id) {
     var k = DB.kajian.find(function(x){ return x.id === id; });
     if (k) {
       state.currentKajianId = id;
+      try{if(window.IKAnalytics)IKAnalytics.track('kajian',String(id));}catch(e){}
       goScreen('detail');
       renderDetail(id);
       return;
@@ -4732,17 +4734,28 @@ function openAnalyticsPanel(host) {
 }
 // ── Telemetri opt-in (login-only, nonblocking) ──
 function ikLoadAnalyticsTracker(){
-  if(root.__ikTrackerLoad)return root.__ikTrackerLoad;
-  if(!window.IKAnalyticsCore){
-    var core=document.createElement('script');core.src='/analytics-core.js';core.async=true;
-    var trk=document.createElement('script');trk.src='/analytics-tracker.js';trk.async=true;
-    root.__ikTrackerLoad=new Promise(function(resolve){
-      core.onload=resolve;trk.onload=resolve;
-      document.head.appendChild(core);document.head.appendChild(trk);
+  if(window.__ikTrackerLoad)return window.__ikTrackerLoad;
+  function load(file,key){
+    if(window[key])return Promise.resolve();
+    return new Promise(function(resolve,reject){
+      var script=document.createElement('script');script.src='/'+file;script.async=true;
+      script.onload=resolve;script.onerror=function(){script.remove();reject(new Error('Gagal memuat '+file));};
+      document.head.appendChild(script);
     });
-    return root.__ikTrackerLoad;
   }
-  return Promise.resolve();
+  window.__ikTrackerLoad=load('analytics-core.js','IKAnalyticsCore')
+    .then(function(){return load('analytics-tracker.js','IKAnalytics');})
+    .catch(function(e){window.__ikTrackerLoad=null;throw e;});
+  return window.__ikTrackerLoad;
+}
+function ikStartAnalyticsIfConsented(){
+  try{
+    if(!state.user||state.user.role==='admin'||localStorage.getItem('ik_analytics_consent')!=='1')return;
+    ikLoadAnalyticsTracker().then(function(){window.IKAnalytics.start();}).catch(function(){});
+  }catch(e){}
+}
+function ikAnalyticsContext(){
+  return {user:state.user,db:window.db,screen:screenHistory.length?screenHistory[screenHistory.length-1]:'home'};
 }
 function setAdminTab(tab,btn) {
   state.adminTab=tab;
@@ -5240,7 +5253,7 @@ async function ikFinishGoogleLogin(user) {
   showToast('Selamat datang, ' + ((u.name || u.email || '').split(' ')[0]) + '!', 's');
   goScreen('home'); renderHome(); injectNavs();
   // Telemetri opt-in: mulai tracker bila pengguna sudah menyetujui. Nonblocking.
-  ikLoadAnalyticsTracker().then(function(){ if(window.IKAnalytics)IKAnalytics.start(); }).catch(function(){});
+  ikStartAnalyticsIfConsented();
   if (state.notifPermission === 'granted') {
     setTimeout(async function () { await initFCM(); await getFCMTokenAndSave(); }, 1000);
   }

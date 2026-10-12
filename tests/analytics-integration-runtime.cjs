@@ -1,0 +1,5 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const html=fs.readFileSync('index.html','utf8');
+function integration(){let scripts=[];const c={Promise,console,document:{createElement:()=>({}),head:{appendChild(s){scripts.push(s);queueMicrotask(()=>{if(s.src.includes('core'))c.IKAnalyticsCore={};if(s.src.includes('tracker'))c.IKAnalytics={start(){}};s.onload();});}}},screenHistory:['kajian'],db:{},state:{user:{id:'u',role:'user'}}};c.window=c;vm.createContext(c);vm.runInContext(html.slice(html.indexOf('function ikLoadAnalyticsTracker(){'),html.indexOf('function setAdminTab(')),c);return {c,scripts};}
+test('pemuat tracker bekerja, menunggu kedua pustaka, dan dapat dipanggil ulang',async()=>{const {c,scripts}=integration();await c.ikLoadAnalyticsTracker();assert.ok(c.IKAnalyticsCore);assert.ok(c.IKAnalytics);await c.ikLoadAnalyticsTracker();assert.equal(scripts.length,2);});
+test('tracker tetap dimuat setelah core lebih dulu dibuka oleh admin',async()=>{const {c}=integration();c.IKAnalyticsCore={};await c.ikLoadAnalyticsTracker();assert.ok(c.IKAnalytics);});

@@ -15,6 +15,7 @@ const ctx={
  setTimeout,clearTimeout,setInterval(){return 1;},clearInterval(){},
  };
 ctx.globalThis=ctx;ctx.window=ctx;
+ctx.ikAnalyticsContext=()=>({user:ctx.state.user,db:ctx.db,screen:ctx.screenHistory[ctx.screenHistory.length-1]||'home'});
 vm.createContext(ctx);
 vm.runInContext(coreSrc,ctx);vm.runInContext(trackerSrc,ctx);vm.runInContext(adminSrc,ctx);
 (async()=>{
@@ -25,13 +26,13 @@ vm.runInContext(coreSrc,ctx);vm.runInContext(trackerSrc,ctx);vm.runInContext(adm
  IK.setConsent(true);
  IK.track('pageview','home');IK.track('kajian','k-abc');IK.track('bookmark','k-abc');
  assert.ok(IK._collector() && IK._collector().size()>=1);
- // 3. Admin ditolak
- ctx.state.user={id:'adm',role:'admin'};
- IK.track('pageview','home'); // harus diabaikan
- // 4. Flush → tulis ke batch (stub)
- IK.flush(); await new Promise(r=>setTimeout(r,20));
+ // 3. Flush → tulis ke batch (stub) sebelum identitas berubah
+ await IK.flush();
  assert.ok(writes.length>=2,'flush menulis event ke Firestore. got '+writes.length);
  writes.forEach(w=>{assert.match(w.ref,/analyticsEvents\/e\d+-u1-s[a-z0-9]+-/);assert.equal(typeof w.data.createdAt,'string');});
+ // 4. Admin ditolak
+ ctx.state.user={id:'adm',role:'admin'};
+ IK.track('pageview','home'); // harus diabaikan
  // 5. Withdraw consent: antrean dibuang
  ctx.state.user={id:'u2',role:'user'};
  IK.track('pageview','home');IK.setConsent(false);assert.ok(!IK._collector() || IK._collector().size()===0);

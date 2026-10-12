@@ -32,10 +32,14 @@
   var status=document.getElementById('ik-an-status'),body=document.getElementById('ik-an-body');
   var btn=document.getElementById('ik-an-refresh'); if(btn){btn.disabled=true;}
   status.textContent='Mengambil data…';
-  if(!root.db||!root.state.user||root.state.user.role!=='admin'){status.textContent='Akses ditolak.';return;}
+  var context=root.ikAnalyticsContext?root.ikAnalyticsContext():{};
+  if(!context.db||!context.user||context.user.role!=='admin'){status.textContent='Akses ditolak.';if(btn)btn.disabled=false;return;}
+  lastSummary=null;
+  var exportButton=document.getElementById('ik-an-export');if(exportButton)exportButton.disabled=true;
   var events=[];
-  var q=root.db.collection('analyticsEvents').orderBy('clientTime','desc').limit(5000);
-  q.get().then(function(snap){
+  return Promise.resolve().then(function(){return context.db.collection('analyticsEvents').orderBy('clientTime','desc').limit(5000).get();}).then(function(snap){
+   var current=root.ikAnalyticsContext();
+   if(!current.user||current.user.role!=='admin'||!document.getElementById('ik-an-body')||document.getElementById('ik-an-body')!==body)return;
    snap.forEach(function(d){events.push(d.data());});
    if(!root.IKAnalyticsCore){status.textContent='Pustaka ringkasan belum termuat.';return;}
    lastSummary=root.IKAnalyticsCore.summarize(events,{now:Date.now()});
